@@ -1,0 +1,148 @@
+import Foundation
+
+public struct PodmanCommandRuntime: PodmanRuntime {
+    private let commandRunner: @Sendable ([String]) async throws -> Data
+
+    public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data = Self.runPodmanCommand) {
+        self.commandRunner = commandRunner
+    }
+
+    public func discoverMachines() async throws -> [PodmanMachine] {
+        let data = try await commandRunner(["machine", "list", "--format", "json"])
+        let machines = try JSONDecoder().decode([PodmanMachineRecord].self, from: data)
+
+        return machines.map {
+            PodmanMachine(
+                id: $0.name,
+                name: $0.name,
+                isRunning: $0.running,
+                isDefault: $0.defaultMachine,
+                connectionName: $0.connectionName
+            )
+        }
+    }
+
+    public func listContainers() async throws -> [ContainerSummary] {
+        let data = try await commandRunner(["ps", "--all", "--format", "json"])
+        let containers = try JSONDecoder().decode([PodmanContainerRecord].self, from: data)
+
+        return containers.map {
+            ContainerSummary(
+                id: $0.id,
+                name: $0.names.first ?? $0.id,
+                image: $0.image,
+                state: $0.state,
+                status: $0.status
+            )
+        }
+    }
+
+    public func createContainer(configuration: OracleContainerConfiguration) async throws {
+        var arguments = [
+            "run",
+            "--detach",
+            "--name", configuration.containerName,
+            "--publish", "\(configuration.hostPort):\(configuration.databasePort)",
+            "--volume", "\(configuration.volumeName):/opt/oracle/oradata",
+            "--health-cmd", configuration.healthCheck.command,
+            "--health-interval", configuration.healthCheck.interval,
+            "--health-timeout", configuration.healthCheck.timeout,
+            "--health-retries", "\(configuration.healthCheck.retries)"
+        ]
+
+        for environmentVariable in configuration.environmentVariables {
+            arguments += ["--env", environmentVariable.assignment]
+        }
+
+        arguments.append(configuration.image)
+
+        _ = try await commandRunner(arguments)
+    }
+
+    public func startContainer(named name: String) async throws {
+        _ = try await commandRunner(["start", name])
+    }
+
+    public func stopContainer(named name: String) async throws {
+        _ = try await commandRunner(["stop", name])
+    }
+
+    public func deleteContainer(named name: String) async throws {
+        _ = try await commandRunner(["rm", "--force", name])
+    }
+
+    public static func runPodmanCommand(arguments: [String]) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            let process = Process()
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["podman"] + arguments
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            process.terminationHandler = { process in
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+
+                guard process.terminationStatus == 0 else {
+                    let message = String(decoding: errorData, as: UTF8.self)
+                    continuation.resume(throwing: PodmanCommandRuntimeError.commandFailed(message: message.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    return
+                }
+
+                continuation.resume(returning: outputData)
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: PodmanCommandRuntimeError.commandFailed(message: error.localizedDescription))
+            }
+        }
+    }
+}
+
+private struct PodmanMachineRecord: Decodable {
+    let name: String
+    let running: Bool
+    let defaultMachine: Bool
+    let connectionName: String
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case running = "Running"
+        case defaultMachine = "Default"
+        case connectionName = "ConnectionName"
+    }
+}
+
+private struct PodmanContainerRecord: Decodable {
+    let id: String
+    let names: [String]
+    let image: String
+    let state: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id = "Id"
+        case names = "Names"
+        case image = "Image"
+        case state = "State"
+        case status = "Status"
+    }
+}
+
+private enum PodmanCommandRuntimeError: LocalizedError {
+    case commandFailed(message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .commandFailed(message) where !message.isEmpty:
+            return message
+        case .commandFailed:
+            return "Unable to run Podman command"
+        }
+    }
+}
