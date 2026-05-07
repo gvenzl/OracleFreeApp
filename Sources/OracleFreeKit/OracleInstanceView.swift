@@ -13,6 +13,7 @@ public protocol OracleInstanceViewing: AnyObject {
 
 public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
     @State private var viewModel: ViewModel
+    @State private var showsDeleteConfirmation = false
     private let openConfiguration: @MainActor () -> Void
 
     public init(
@@ -25,6 +26,25 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
 
     @ViewBuilder
     public var body: some View {
+        statusContent
+            .confirmationDialog(
+                "Delete Oracle Database Free?",
+                isPresented: $showsDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Oracle Database Free", role: .destructive) {
+                    Task {
+                        await viewModel.deleteInstance()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the container and configured volume.")
+            }
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
         switch viewModel.status {
         case .missing:
             VStack(alignment: .leading, spacing: 12) {
@@ -54,11 +74,7 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
                         await viewModel.startInstance()
                     }
                 }
-                Button("Delete Oracle Database Free") {
-                    Task {
-                        await viewModel.deleteInstance()
-                    }
-                }
+                deleteButton()
             }
         case let .running(details):
             VStack(alignment: .leading, spacing: 12) {
@@ -75,22 +91,14 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
         case let .ready(details):
             VStack(alignment: .leading, spacing: 12) {
                 Text("Oracle Database Free is ready")
-                Text("Service: \(details.connectionInfo.serviceName)")
-                Text("Host: \(details.connectionInfo.host)")
-                Text("Port: \(String(details.connectionInfo.port))")
-                Text("Username: \(details.connectionInfo.username)")
-                Text("Password: \(details.connectionInfo.password)")
+                connectionDetailsView(details.connectionInfo)
                 containerDetailsBox(details, trafficLight: .running)
                 Button("Stop Oracle Database Free") {
                     Task {
                         await viewModel.stopInstance()
                     }
                 }
-                Button("Delete Oracle Database Free") {
-                    Task {
-                        await viewModel.deleteInstance()
-                    }
-                }
+                deleteButton()
             }
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
@@ -99,6 +107,29 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
                 containerLogsView()
             }
         }
+    }
+
+    private func deleteButton() -> some View {
+        Button("Delete Oracle Database Free", role: .destructive) {
+            showsDeleteConfirmation = true
+        }
+    }
+
+    private func connectionDetailsView(_ connectionInfo: OracleConnectionInfo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Connection Details")
+            Text("Service: \(connectionInfo.serviceName)")
+            Text("Host: \(connectionInfo.host)")
+            Text("Port: \(String(connectionInfo.port))")
+            Text("Username: \(connectionInfo.username)")
+            Text("Password: \(connectionInfo.password)")
+            Text("Connection String: \(connectionString(for: connectionInfo))")
+        }
+        .textSelection(.enabled)
+    }
+
+    private func connectionString(for connectionInfo: OracleConnectionInfo) -> String {
+        "\(connectionInfo.username)/\(connectionInfo.password)@\(connectionInfo.host):\(connectionInfo.port)/\(connectionInfo.serviceName)"
     }
 
     private func containerDetailsBox(

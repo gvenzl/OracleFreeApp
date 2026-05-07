@@ -151,9 +151,11 @@ struct RootViewTests {
         let output = String(describing: view.body)
 
         #expect(output.contains("Oracle Database Free is ready"))
+        #expect(output.contains("Connection Details"))
         #expect(output.contains("FREEPDB1"))
         #expect(output.contains("Username: system"))
         #expect(output.contains("Password: OracleFree123"))
+        #expect(output.contains("Connection String: system/OracleFree123@localhost:1521/FREEPDB1"))
         #expect(output.contains("Container"))
         #expect(output.contains("OracleFreeAppIcon"))
         #expect(output.contains("Running"))
@@ -190,6 +192,7 @@ struct RootViewTests {
         #expect(output.contains("oracle-free"))
         #expect(output.contains("Start Oracle Database Free"))
         #expect(output.contains("Delete Oracle Database Free"))
+        #expect(output.contains("This removes the container and configured volume."))
     }
 
     @Test func oracleInstanceViewRendersRunningStateWithContainerDetails() {
