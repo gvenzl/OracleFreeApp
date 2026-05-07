@@ -47,10 +47,10 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
                 Text("Install Docker, Podman, or Rancher Desktop, then try again.")
             }
         case let .oneRuntimeAvailable(runtime):
-            selectedRuntimeView(for: runtime)
+            selectedRuntimeView(for: runtime, canChangeRuntime: false)
         case .multipleRuntimesAvailable:
             if let runtime = runtimeSelectionViewModel.selectedRuntime {
-                selectedRuntimeView(for: runtime)
+                selectedRuntimeView(for: runtime, canChangeRuntime: true)
             } else {
                 RuntimeSelectionView(viewModel: runtimeSelectionViewModel)
             }
@@ -58,15 +58,37 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
     }
 
     @ViewBuilder
-    private func selectedRuntimeView(for runtime: ContainerRuntimeKind) -> some View {
-        switch runtime {
-        case .podman:
-            podmanRuntimeView()
-        case .docker, .rancherDesktop:
-            OracleInstanceView(
-                viewModel: oracleInstanceViewModel,
-                openConfiguration: openConfiguration
-            )
+    private func selectedRuntimeView(
+        for runtime: ContainerRuntimeKind,
+        canChangeRuntime: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            runtimeHeader(for: runtime, canChangeRuntime: canChangeRuntime)
+
+            switch runtime {
+            case .podman:
+                podmanRuntimeView()
+            case .docker, .rancherDesktop:
+                OracleInstanceView(
+                    viewModel: oracleInstanceViewModel,
+                    openConfiguration: openConfiguration
+                )
+            }
+        }
+    }
+
+    private func runtimeHeader(
+        for runtime: ContainerRuntimeKind,
+        canChangeRuntime: Bool
+    ) -> some View {
+        HStack {
+            Text("Runtime: \(runtime.displayName)")
+            Spacer()
+            if canChangeRuntime {
+                Button("Change Runtime") {
+                    runtimeSelectionViewModel.clearSelection()
+                }
+            }
         }
     }
 

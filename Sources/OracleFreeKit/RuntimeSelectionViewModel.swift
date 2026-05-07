@@ -29,4 +29,8 @@ public final class RuntimeSelectionViewModel {
 
         selectedRuntime = runtime
     }
+
+    public func clearSelection() {
+        selectedRuntime = nil
+    }
 }

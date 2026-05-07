@@ -65,7 +65,7 @@ The password is shown in clear text because it is local container configuration 
 
 ## Runtime Behavior
 
-On launch, the app detects installed runtimes. If multiple runtimes are available, it asks you to choose Docker, Podman, or Rancher Desktop.
+On launch, the app detects installed runtimes. If multiple runtimes are available, it asks you to choose Docker, Podman, or Rancher Desktop. After a runtime is selected, the main window shows the active runtime and offers a **Change Runtime** button when more than one runtime is available.
 
 For Podman, the app loads available Podman machines. A single running default machine is selected automatically. Otherwise, the app shows the machine list or a start button for a stopped machine.
 

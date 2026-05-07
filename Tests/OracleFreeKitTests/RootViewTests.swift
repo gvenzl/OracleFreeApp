@@ -81,6 +81,27 @@ struct RootViewTests {
         #expect(output.contains("OracleInstanceView"))
     }
 
+    @Test func rootViewRendersSelectedRuntimeHeaderWhenMultipleRuntimesAreAvailable() async {
+        let runtimeSelectionViewModel = RuntimeSelectionViewModel(
+            availableRuntimes: [.docker, .podman, .rancherDesktop],
+            selectedRuntime: .docker
+        )
+        let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.multipleRuntimesAvailable([.docker, .podman, .rancherDesktop]))))
+        await viewModel.loadRuntimes()
+        let rootView = RootView(
+            appViewModel: viewModel,
+            selectionViewModel: MachineSelectionViewModel(),
+            runtimeSelectionViewModel: runtimeSelectionViewModel,
+            oracleInstanceViewModel: OracleInstanceViewModel(service: PreviewOracleInstanceService(status: .missing))
+        )
+
+        let output = String(describing: rootView.body)
+
+        #expect(output.contains("Runtime: Docker"))
+        #expect(output.contains("Change Runtime"))
+        #expect(output.contains("OracleInstanceView"))
+    }
+
     @Test func rootViewRoutesRancherDesktopRuntimeToOracleLifecycle() async {
         let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.oneRuntimeAvailable(.rancherDesktop))))
         let oracleViewModel = OracleInstanceViewModel(service: PreviewOracleInstanceService(status: .missing))

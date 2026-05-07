@@ -18,4 +18,16 @@ struct RuntimeSelectionViewModelTests {
         #expect(viewModel.selectedRuntime == .docker)
         #expect(viewModel.selection == ContainerRuntimeSelection(runtime: .docker))
     }
+
+    @Test func runtimeSelectionViewModelClearsRuntimeSelection() {
+        let viewModel = RuntimeSelectionViewModel(
+            availableRuntimes: [.podman, .docker],
+            selectedRuntime: .docker
+        )
+
+        viewModel.clearSelection()
+
+        #expect(viewModel.selectedRuntime == nil)
+        #expect(viewModel.selection == nil)
+    }
 }
