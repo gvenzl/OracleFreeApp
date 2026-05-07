@@ -49,7 +49,7 @@ public struct OracleContainerConfigurationDialogView: View {
 
                 GridRow {
                     Text("Password")
-                    SecureField("Password", text: settingBinding(\.password))
+                    TextField("Password", text: settingBinding(\.password))
                         .textFieldStyle(.roundedBorder)
                 }
             }

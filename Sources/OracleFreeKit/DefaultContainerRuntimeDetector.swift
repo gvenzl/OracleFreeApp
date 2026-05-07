@@ -1,19 +1,21 @@
 import Foundation
 
 public struct DefaultContainerRuntimeDetector: ContainerRuntimeDetector {
-    private let lookupExecutable: @Sendable (ContainerRuntimeKind) -> String?
+    private let lookupExecutableNamed: @Sendable (String) -> String?
 
     public init() {
-        self.lookupExecutable = Self.defaultLookupExecutable
+        self.lookupExecutableNamed = Self.defaultLookupExecutable(named:)
     }
 
-    public init(lookupExecutable: @escaping @Sendable (ContainerRuntimeKind) -> String?) {
-        self.lookupExecutable = lookupExecutable
+    public init(lookupExecutableNamed: @escaping @Sendable (String) -> String?) {
+        self.lookupExecutableNamed = lookupExecutableNamed
     }
 
     public func detectInstalledRuntimes() async throws -> ContainerRuntimeInstallationStatus {
         let installedRuntimes = ContainerRuntimeKind.allCases.filter { runtime in
-            lookupExecutable(runtime) != nil
+            runtime.requiredExecutableNames.allSatisfy { executableName in
+                lookupExecutableNamed(executableName) != nil
+            }
         }
 
         switch installedRuntimes.count {
@@ -26,12 +28,12 @@ public struct DefaultContainerRuntimeDetector: ContainerRuntimeDetector {
         }
     }
 
-    static func defaultLookupExecutable(_ runtime: ContainerRuntimeKind) -> String? {
+    static func defaultLookupExecutable(named executableName: String) -> String? {
         let process = Process()
         let outputPipe = Pipe()
 
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = [runtime.rawValue]
+        process.arguments = [executableName]
         process.standardOutput = outputPipe
         process.standardError = Pipe()
 

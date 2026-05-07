@@ -5,6 +5,7 @@ import Observation
 @Observable
 public final class OracleInstanceViewModel {
     public private(set) var status: OracleInstanceStatus
+    public private(set) var containerLogs: String?
     public var containerSettings: OracleContainerSettings
 
     private let service: any OracleInstanceServicing
@@ -112,9 +113,11 @@ public final class OracleInstanceViewModel {
             } else {
                 status = inspectedStatus
             }
+            await updateContainerLogs(for: status, configuration: configuration)
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             status = .failed(message: message)
+            containerLogs = try? await service.containerLogs(configuration: configuration)
         }
     }
 
@@ -139,6 +142,18 @@ public final class OracleInstanceViewModel {
         }
 
         return currentStatus
+    }
+
+    private func updateContainerLogs(
+        for status: OracleInstanceStatus,
+        configuration: OracleContainerConfiguration
+    ) async {
+        switch status {
+        case .running, .failed:
+            containerLogs = try? await service.containerLogs(configuration: configuration)
+        case .missing, .creating, .stopped, .ready:
+            containerLogs = nil
+        }
     }
 
     private static func startingDetails(from details: OracleContainerDetails) -> OracleContainerDetails {

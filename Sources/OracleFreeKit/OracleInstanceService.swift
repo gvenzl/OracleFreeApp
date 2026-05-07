@@ -6,6 +6,7 @@ public protocol OracleInstanceServicing: Sendable {
     func startInstance(configuration: OracleContainerConfiguration) async throws
     func stopInstance(configuration: OracleContainerConfiguration) async throws
     func deleteInstance(configuration: OracleContainerConfiguration) async throws
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String
 }
 
 public struct OracleInstanceService: OracleInstanceServicing {
@@ -78,6 +79,10 @@ public struct OracleInstanceService: OracleInstanceServicing {
         }
     }
 
+    public func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        try await runtime.containerLogs(named: configuration.containerName)
+    }
+
     private func containerDetails(
         for container: ContainerSummary,
         configuration: OracleContainerConfiguration
@@ -94,9 +99,17 @@ public struct OracleInstanceService: OracleInstanceServicing {
                 host: "localhost",
                 port: configuration.hostPort,
                 serviceName: "FREEPDB1",
-                username: "system"
+                username: "system",
+                password: password(from: configuration)
             )
         )
+    }
+
+    private func password(from configuration: OracleContainerConfiguration) -> String {
+        configuration.environmentVariables.first { variable in
+            let name = variable.name.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            return name == "ORACLE_PASSWORD" || name == "ORACLE_PWD"
+        }?.value ?? ""
     }
 
     private static func isReadyStatus(_ status: String) -> Bool {

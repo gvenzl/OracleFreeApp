@@ -86,6 +86,11 @@ public struct PodmanCommandRuntime: PodmanRuntime {
         _ = try await commandRunner(["volume", "rm", "--force", name])
     }
 
+    public func containerLogs(named name: String) async throws -> String {
+        let data = try await commandRunner(["logs", "--tail", "120", name])
+        return String(decoding: data, as: UTF8.self)
+    }
+
     public static func runPodmanCommand(arguments: [String]) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()

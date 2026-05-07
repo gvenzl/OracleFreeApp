@@ -17,4 +17,12 @@ struct ContainerRuntimeFactoryTests {
 
         #expect(runtime is DockerCommandRuntime)
     }
+
+    @Test func defaultFactoryCreatesRancherDesktopRuntimeForRancherSelection() {
+        let factory = DefaultContainerRuntimeFactory()
+
+        let runtime = factory.makeRuntime(for: .rancherDesktop)
+
+        #expect(runtime is RancherDesktopCommandRuntime)
+    }
 }

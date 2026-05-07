@@ -15,6 +15,8 @@ struct OracleContainerConfigurationDialogViewTests {
         #expect(output.contains("Host Port"))
         #expect(output.contains("Volume Name"))
         #expect(output.contains("Password"))
+        #expect(output.contains("TextField"))
+        #expect(!output.contains("SecureField"))
         #expect(output.contains("Extra Environment Variables"))
         #expect(output.contains("Key"))
         #expect(output.contains("Value"))

@@ -55,6 +55,36 @@ struct OracleInstanceServiceTests {
         #expect(status == .ready(.default))
     }
 
+    @Test func serviceIncludesConfiguredPasswordInConnectionInfo() async throws {
+        let configuration = OracleContainerSettings(
+            image: "ghcr.io/gvenzl/oracle-free",
+            containerName: "oracle-dev",
+            hostPort: 11521,
+            volumeName: "oracle-dev-data",
+            password: "LocalPassword123",
+            extraEnvironmentVariables: []
+        ).containerConfiguration()
+        let runtime = FakeContainerRuntime(containers: [
+            ContainerSummary(
+                id: "container-1",
+                name: "oracle-dev",
+                image: "ghcr.io/gvenzl/oracle-free",
+                state: "running",
+                status: "healthy"
+            )
+        ])
+        let service = OracleInstanceService(runtime: runtime, configuration: configuration)
+
+        let status = try await service.inspectInstance()
+
+        guard case let .ready(details) = status else {
+            Issue.record("Expected ready status")
+            return
+        }
+
+        #expect(details.connectionInfo.password == "LocalPassword123")
+    }
+
     @Test func serviceKeepsRunningContainerInStartingStateUntilHealthIsReady() async throws {
         let runtime = FakeContainerRuntime(containers: [
             ContainerSummary(
@@ -174,18 +204,32 @@ struct OracleInstanceServiceTests {
         #expect(recordedDeletes == ["oracle-dev"])
         #expect(recordedVolumeDeletes == [])
     }
+
+    @Test func serviceLoadsContainerLogsThroughRuntime() async throws {
+        let runtime = FakeContainerRuntime(containers: [], containerLogs: "startup log lines")
+        let service = OracleInstanceService(runtime: runtime, configuration: .default)
+
+        let logs = try await service.containerLogs(configuration: .default)
+
+        let recordedLogNames = await runtime.loggedContainerNames
+        #expect(logs == "startup log lines")
+        #expect(recordedLogNames == [OracleContainerConfiguration.default.containerName])
+    }
 }
 
 private actor FakeContainerRuntime: ContainerRuntime {
     let containers: [ContainerSummary]
+    let containerLogs: String
     private(set) var startedContainerNames: [String] = []
     private(set) var stoppedContainerNames: [String] = []
     private(set) var deletedContainerNames: [String] = []
     private(set) var deletedVolumeNames: [String] = []
+    private(set) var loggedContainerNames: [String] = []
     private(set) var createdConfigurations: [OracleContainerConfiguration] = []
 
-    init(containers: [ContainerSummary]) {
+    init(containers: [ContainerSummary], containerLogs: String = "") {
         self.containers = containers
+        self.containerLogs = containerLogs
     }
 
     func listContainers() async throws -> [ContainerSummary] {
@@ -210,5 +254,10 @@ private actor FakeContainerRuntime: ContainerRuntime {
 
     func deleteVolume(named name: String) async throws {
         deletedVolumeNames.append(name)
+    }
+
+    func containerLogs(named name: String) async throws -> String {
+        loggedContainerNames.append(name)
+        return containerLogs
     }
 }

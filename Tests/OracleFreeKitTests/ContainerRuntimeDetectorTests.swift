@@ -4,7 +4,7 @@ import Testing
 struct ContainerRuntimeDetectorTests {
     @Test func detectorReportsNoSupportedRuntimeInstalled() async throws {
         let detector = DefaultContainerRuntimeDetector(
-            lookupExecutable: { _ in nil }
+            lookupExecutableNamed: { _ in nil }
         )
 
         let status = try await detector.detectInstalledRuntimes()
@@ -14,13 +14,8 @@ struct ContainerRuntimeDetectorTests {
 
     @Test func detectorReportsOneInstalledRuntime() async throws {
         let detector = DefaultContainerRuntimeDetector(
-            lookupExecutable: { runtime in
-                switch runtime {
-                case .podman:
-                    "/opt/homebrew/bin/podman"
-                case .docker:
-                    nil
-                }
+            lookupExecutableNamed: { executableName in
+                executableName == "podman" ? "/opt/homebrew/bin/podman" : nil
             }
         )
 
@@ -31,18 +26,55 @@ struct ContainerRuntimeDetectorTests {
 
     @Test func detectorReportsMultipleInstalledRuntimes() async throws {
         let detector = DefaultContainerRuntimeDetector(
-            lookupExecutable: { runtime in
-                switch runtime {
-                case .podman:
-                    "/opt/homebrew/bin/podman"
-                case .docker:
+            lookupExecutableNamed: { executableName in
+                switch executableName {
+                case "docker":
                     "/Applications/Docker.app/Contents/Resources/bin/docker"
+                case "podman":
+                    "/opt/homebrew/bin/podman"
+                case "rdctl":
+                    "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl"
+                case "nerdctl":
+                    "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+                default:
+                    nil
                 }
             }
         )
 
         let status = try await detector.detectInstalledRuntimes()
 
-        #expect(status == .multipleRuntimesAvailable([.podman, .docker]))
+        #expect(status == .multipleRuntimesAvailable([.docker, .podman, .rancherDesktop]))
+    }
+
+    @Test func detectorReportsRancherDesktopWhenRancherDesktopCommandsAreInstalled() async throws {
+        let detector = DefaultContainerRuntimeDetector(
+            lookupExecutableNamed: { executableName in
+                switch executableName {
+                case "rdctl":
+                    "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl"
+                case "nerdctl":
+                    "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+                default:
+                    nil
+                }
+            }
+        )
+
+        let status = try await detector.detectInstalledRuntimes()
+
+        #expect(status == .oneRuntimeAvailable(.rancherDesktop))
+    }
+
+    @Test func detectorDoesNotReportRancherDesktopWhenNerdctlIsMissing() async throws {
+        let detector = DefaultContainerRuntimeDetector(
+            lookupExecutableNamed: { executableName in
+                executableName == "rdctl" ? "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl" : nil
+            }
+        )
+
+        let status = try await detector.detectInstalledRuntimes()
+
+        #expect(status == .noSupportedRuntimeInstalled)
     }
 }

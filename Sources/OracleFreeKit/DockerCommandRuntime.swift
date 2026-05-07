@@ -3,7 +3,13 @@ import Foundation
 public struct DockerCommandRuntime: ContainerRuntime {
     private let commandRunner: @Sendable ([String]) async throws -> Data
 
-    public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data = Self.runDockerCommand) {
+    public init(commandName: String = "docker") {
+        self.commandRunner = { arguments in
+            try await Self.runCommand(commandName: commandName, arguments: arguments)
+        }
+    }
+
+    public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data) {
         self.commandRunner = commandRunner
     }
 
@@ -72,14 +78,23 @@ public struct DockerCommandRuntime: ContainerRuntime {
         _ = try await commandRunner(["volume", "rm", "--force", name])
     }
 
+    public func containerLogs(named name: String) async throws -> String {
+        let data = try await commandRunner(["logs", "--tail", "120", name])
+        return String(decoding: data, as: UTF8.self)
+    }
+
     public static func runDockerCommand(arguments: [String]) async throws -> Data {
+        try await runCommand(commandName: "docker", arguments: arguments)
+    }
+
+    public static func runCommand(commandName: String, arguments: [String]) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let outputPipe = Pipe()
             let errorPipe = Pipe()
 
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["docker"] + arguments
+            process.arguments = [commandName] + arguments
             process.standardOutput = outputPipe
             process.standardError = errorPipe
 

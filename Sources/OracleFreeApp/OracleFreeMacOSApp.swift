@@ -7,7 +7,7 @@ struct OracleFreeMacOSApp: App {
     @NSApplicationDelegateAdaptor(OracleFreeApplicationDelegate.self) private var appDelegate
     @State private var appViewModel = AppViewModel(runtimeDetector: DefaultContainerRuntimeDetector())
     @State private var selectionViewModel = MachineSelectionViewModel()
-    @State private var runtimeSelectionViewModel = RuntimeSelectionViewModel(availableRuntimes: [.podman, .docker])
+    @State private var runtimeSelectionViewModel = RuntimeSelectionViewModel(availableRuntimes: ContainerRuntimeKind.allCases)
     @State private var oracleInstanceViewModel = Self.makeOracleInstanceViewModel(for: .podman)
     @State private var showsConfigurationDialog = false
 
@@ -130,7 +130,7 @@ struct OracleFreeMacOSApp: App {
 
     private func loadOracleStatusIfRuntimeIsReady(_ runtime: ContainerRuntimeKind) async {
         switch runtime {
-        case .docker:
+        case .docker, .rancherDesktop:
             await oracleInstanceViewModel.loadStatus()
         case .podman:
             guard case .selected = selectionViewModel.status else {

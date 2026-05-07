@@ -18,7 +18,7 @@ public struct RuntimeSelectionView<ViewModel: RuntimeSelectionViewing>: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Select a container runtime")
             ForEach(viewModel.availableRuntimes, id: \.self) { runtime in
-                Button(runtime.rawValue) {
+                Button(runtime.displayName) {
                     viewModel.select(runtime)
                 }
             }

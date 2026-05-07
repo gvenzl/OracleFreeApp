@@ -122,6 +122,17 @@ struct DockerCommandRuntimeContainerTests {
 
         #expect(await recorder.recordedArguments == [["volume", "rm", "--force", "oracle-free-data"]])
     }
+
+    @Test func dockerRuntimeLoadsContainerLogs() async throws {
+        let runtime = DockerCommandRuntime(commandRunner: { arguments in
+            #expect(arguments == ["logs", "--tail", "120", "oracle-free"])
+            return Data("startup logs".utf8)
+        })
+
+        let logs = try await runtime.containerLogs(named: "oracle-free")
+
+        #expect(logs == "startup logs")
+    }
 }
 
 private actor CommandRecorder {

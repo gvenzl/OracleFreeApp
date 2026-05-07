@@ -58,6 +58,17 @@ struct PodmanCommandRuntimeContainerTests {
         #expect(await recorder.recordedArguments == [["volume", "rm", "--force", "oracle-free-data"]])
     }
 
+    @Test func podmanRuntimeLoadsContainerLogs() async throws {
+        let runtime = PodmanCommandRuntime(commandRunner: { arguments in
+            #expect(arguments == ["logs", "--tail", "120", "oracle-free"])
+            return Data("startup logs".utf8)
+        })
+
+        let logs = try await runtime.containerLogs(named: "oracle-free")
+
+        #expect(logs == "startup logs")
+    }
+
     @Test func podmanRuntimeListsMachinesWhenConnectionNameIsMissing() async throws {
         let runtime = PodmanCommandRuntime(commandRunner: { arguments in
             #expect(arguments == ["machine", "list", "--format", "json"])

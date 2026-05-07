@@ -51,6 +51,7 @@ private extension OracleContainerDetails {
 @Observable
 private final class PreviewMenuBarOracleInstanceViewModel: OracleInstanceViewing {
     let status: OracleInstanceStatus
+    let containerLogs: String? = nil
     var containerSettings: OracleContainerSettings = .default
 
     init(status: OracleInstanceStatus) {

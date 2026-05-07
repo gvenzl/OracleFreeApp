@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import OracleFreeKit
 
@@ -30,6 +31,31 @@ struct OracleInstanceViewModelTests {
         #expect(await service.createCallCount == 1)
         #expect(viewModel.status == .ready(.default))
         #expect(await service.inspectCallCount == 2)
+    }
+
+    @Test func oracleInstanceViewModelLoadsContainerLogsWhenReadinessDoesNotComplete() async throws {
+        let service = SequenceOracleInstanceService(
+            statuses: [.running(.default)],
+            logs: "DATABASE IS READY TO USE would appear here after startup completes"
+        )
+        let viewModel = Self.makeViewModel(service: service, maximumReadinessChecks: 1)
+
+        await viewModel.createInstance()
+
+        #expect(viewModel.status == .running(.default))
+        #expect(viewModel.containerLogs == "DATABASE IS READY TO USE would appear here after startup completes")
+        #expect(await service.logsCallCount == 1)
+    }
+
+    @Test func oracleInstanceViewModelLoadsContainerLogsWhenCreateFails() async throws {
+        let service = FailingCreateOracleInstanceService(logs: "listener failed to bind to host port")
+        let viewModel = Self.makeViewModel(service: service)
+
+        await viewModel.createInstance()
+
+        #expect(viewModel.status == .failed(message: "create failed"))
+        #expect(viewModel.containerLogs == "listener failed to bind to host port")
+        #expect(await service.logsCallCount == 1)
     }
 
     @Test func oracleInstanceViewModelCreatesWithCurrentSettingsAndKeepsOriginalConfiguration() async throws {
@@ -161,16 +187,23 @@ private actor FakeOracleInstanceService: OracleInstanceServicing {
     func deleteInstance(configuration: OracleContainerConfiguration) async throws {
         deleteCallCount += 1
     }
+
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        ""
+    }
 }
 
 private actor SequenceOracleInstanceService: OracleInstanceServicing {
     private var statuses: [OracleInstanceStatus]
+    private let logs: String
     private(set) var inspectCallCount = 0
     private(set) var createCallCount = 0
     private(set) var startCallCount = 0
+    private(set) var logsCallCount = 0
 
-    init(statuses: [OracleInstanceStatus]) {
+    init(statuses: [OracleInstanceStatus], logs: String = "") {
         self.statuses = statuses
+        self.logs = logs
     }
 
     func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
@@ -192,6 +225,43 @@ private actor SequenceOracleInstanceService: OracleInstanceServicing {
 
     func stopInstance(configuration: OracleContainerConfiguration) async throws {}
     func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
+
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        logsCallCount += 1
+        return logs
+    }
+}
+
+private actor FailingCreateOracleInstanceService: OracleInstanceServicing {
+    private let logs: String
+    private(set) var logsCallCount = 0
+
+    init(logs: String) {
+        self.logs = logs
+    }
+
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
+        .missing
+    }
+
+    func createInstance(configuration: OracleContainerConfiguration) async throws {
+        throw FailingCreateError()
+    }
+
+    func startInstance(configuration: OracleContainerConfiguration) async throws {}
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {}
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
+
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        logsCallCount += 1
+        return logs
+    }
+}
+
+private struct FailingCreateError: LocalizedError {
+    var errorDescription: String? {
+        "create failed"
+    }
 }
 
 private actor RecordingOracleInstanceService: OracleInstanceServicing {
@@ -211,6 +281,10 @@ private actor RecordingOracleInstanceService: OracleInstanceServicing {
 
     func deleteInstance(configuration: OracleContainerConfiguration) async throws {
         deletedConfigurations.append(configuration)
+    }
+
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        ""
     }
 }
 
@@ -255,4 +329,8 @@ private actor SuspendedCreateOracleInstanceService: OracleInstanceServicing {
     func startInstance(configuration: OracleContainerConfiguration) async throws {}
     func stopInstance(configuration: OracleContainerConfiguration) async throws {}
     func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
+
+    func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
+        ""
+    }
 }

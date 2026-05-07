@@ -7,10 +7,12 @@ public struct DefaultContainerRuntimeFactory: ContainerRuntimeFactory {
 
     public func makeRuntime(for kind: ContainerRuntimeKind) -> any ContainerRuntime {
         switch kind {
-        case .podman:
-            return PodmanCommandRuntime()
         case .docker:
             return DockerCommandRuntime()
+        case .podman:
+            return PodmanCommandRuntime()
+        case .rancherDesktop:
+            return RancherDesktopCommandRuntime()
         }
     }
 }

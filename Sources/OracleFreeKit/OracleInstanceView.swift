@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 public protocol OracleInstanceViewing: AnyObject {
     var status: OracleInstanceStatus { get }
+    var containerLogs: String? { get }
     var containerSettings: OracleContainerSettings { get set }
     func createInstance() async
     func startInstance() async
@@ -64,6 +65,7 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
                 Text("Oracle Database Free is starting")
                 ProgressView()
                 containerDetailsBox(details, trafficLight: .starting)
+                containerLogsView()
                 Button("Stop Oracle Database Free") {
                     Task {
                         await viewModel.stopInstance()
@@ -76,6 +78,8 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
                 Text("Service: \(details.connectionInfo.serviceName)")
                 Text("Host: \(details.connectionInfo.host)")
                 Text("Port: \(String(details.connectionInfo.port))")
+                Text("Username: \(details.connectionInfo.username)")
+                Text("Password: \(details.connectionInfo.password)")
                 containerDetailsBox(details, trafficLight: .running)
                 Button("Stop Oracle Database Free") {
                     Task {
@@ -92,6 +96,7 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Oracle Database Free failed")
                 Text(message)
+                containerLogsView()
             }
         }
     }
@@ -141,6 +146,22 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
         return trimmedVolumeName.isEmpty ? "No volume defined" : trimmedVolumeName
     }
 
+    @ViewBuilder
+    private func containerLogsView() -> some View {
+        if let logs = viewModel.containerLogs?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !logs.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Container Logs")
+                ScrollView {
+                    Text(logs)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minHeight: 80, maxHeight: 180)
+            }
+        }
+    }
 }
 
 extension OracleInstanceViewModel: OracleInstanceViewing {}
