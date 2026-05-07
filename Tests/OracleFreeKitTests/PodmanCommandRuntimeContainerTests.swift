@@ -31,6 +31,26 @@ struct PodmanCommandRuntimeContainerTests {
         ))
     }
 
+    @Test func podmanRuntimeReportsInvalidContainerJson() async {
+        let runtime = PodmanCommandRuntime(commandRunner: { _ in
+            Data("not-json".utf8)
+        })
+
+        await #expect(throws: ContainerRuntimeDataError.self) {
+            _ = try await runtime.listContainers()
+        }
+    }
+
+    @Test func podmanRuntimeReportsInvalidMachineJson() async {
+        let runtime = PodmanCommandRuntime(commandRunner: { _ in
+            Data("not-json".utf8)
+        })
+
+        await #expect(throws: ContainerRuntimeDataError.self) {
+            _ = try await runtime.discoverMachines()
+        }
+    }
+
     @Test func podmanRuntimeStartsContainer() async throws {
         let recorder = CommandRecorder()
         let runtime = PodmanCommandRuntime(commandRunner: recorder.recordingRunner)

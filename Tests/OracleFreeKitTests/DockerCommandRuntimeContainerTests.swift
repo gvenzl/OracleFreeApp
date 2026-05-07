@@ -32,6 +32,16 @@ struct DockerCommandRuntimeContainerTests {
         ])
     }
 
+    @Test func dockerRuntimeReportsInvalidContainerJson() async {
+        let runtime = DockerCommandRuntime(commandRunner: { _ in
+            Data("not-json".utf8)
+        })
+
+        await #expect(throws: ContainerRuntimeDataError.self) {
+            _ = try await runtime.listContainers()
+        }
+    }
+
     @Test func dockerRuntimeCreatesContainerWithConfiguration() async throws {
         let configuration = OracleContainerConfiguration(
             containerName: "oracle-dev",

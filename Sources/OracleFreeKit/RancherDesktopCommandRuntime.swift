@@ -4,7 +4,10 @@ public struct RancherDesktopCommandRuntime: ContainerRuntime {
     private let dockerCompatibleRuntime: DockerCommandRuntime
 
     public init() {
-        self.dockerCompatibleRuntime = DockerCommandRuntime(commandName: "nerdctl")
+        self.dockerCompatibleRuntime = DockerCommandRuntime(
+            commandName: "nerdctl",
+            runtimeName: "Rancher Desktop"
+        )
     }
 
     public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data) {

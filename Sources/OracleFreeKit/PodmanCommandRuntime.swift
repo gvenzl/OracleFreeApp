@@ -9,7 +9,13 @@ public struct PodmanCommandRuntime: PodmanRuntime {
 
     public func discoverMachines() async throws -> [PodmanMachine] {
         let data = try await commandRunner(["machine", "list", "--format", "json"])
-        let machines = try JSONDecoder().decode([PodmanMachineRecord].self, from: data)
+        let machines: [PodmanMachineRecord]
+
+        do {
+            machines = try JSONDecoder().decode([PodmanMachineRecord].self, from: data)
+        } catch {
+            throw ContainerRuntimeDataError.invalidRuntimeJSON(context: "Podman machine list")
+        }
 
         return machines.map {
             PodmanMachine(
@@ -28,7 +34,13 @@ public struct PodmanCommandRuntime: PodmanRuntime {
 
     public func listContainers() async throws -> [ContainerSummary] {
         let data = try await commandRunner(["ps", "--all", "--format", "json"])
-        let containers = try JSONDecoder().decode([PodmanContainerRecord].self, from: data)
+        let containers: [PodmanContainerRecord]
+
+        do {
+            containers = try JSONDecoder().decode([PodmanContainerRecord].self, from: data)
+        } catch {
+            throw ContainerRuntimeDataError.invalidRuntimeJSON(context: "Podman container list")
+        }
 
         return containers.map {
             ContainerSummary(
@@ -108,7 +120,11 @@ public struct PodmanCommandRuntime: PodmanRuntime {
 
                 guard process.terminationStatus == 0 else {
                     let message = String(decoding: errorData, as: UTF8.self)
-                    continuation.resume(throwing: PodmanCommandRuntimeError.commandFailed(message: message.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    continuation.resume(throwing: ContainerRuntimeCommandFailure(
+                        runtimeName: "Podman",
+                        operation: ContainerRuntimeOperation(arguments: arguments),
+                        message: message
+                    ))
                     return
                 }
 
@@ -118,7 +134,11 @@ public struct PodmanCommandRuntime: PodmanRuntime {
             do {
                 try process.run()
             } catch {
-                continuation.resume(throwing: PodmanCommandRuntimeError.commandFailed(message: error.localizedDescription))
+                continuation.resume(throwing: ContainerRuntimeCommandFailure(
+                    runtimeName: "Podman",
+                    operation: ContainerRuntimeOperation(arguments: arguments),
+                    message: error.localizedDescription
+                ))
             }
         }
     }
@@ -151,18 +171,5 @@ private struct PodmanContainerRecord: Decodable {
         case image = "Image"
         case state = "State"
         case status = "Status"
-    }
-}
-
-private enum PodmanCommandRuntimeError: LocalizedError {
-    case commandFailed(message: String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .commandFailed(message) where !message.isEmpty:
-            return message
-        case .commandFailed:
-            return "Unable to run Podman command"
-        }
     }
 }

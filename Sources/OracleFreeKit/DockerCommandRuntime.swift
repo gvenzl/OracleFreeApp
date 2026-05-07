@@ -3,9 +3,9 @@ import Foundation
 public struct DockerCommandRuntime: ContainerRuntime {
     private let commandRunner: @Sendable ([String]) async throws -> Data
 
-    public init(commandName: String = "docker") {
+    public init(commandName: String = "docker", runtimeName: String = "Docker") {
         self.commandRunner = { arguments in
-            try await Self.runCommand(commandName: commandName, arguments: arguments)
+            try await Self.runCommand(commandName: commandName, runtimeName: runtimeName, arguments: arguments)
         }
     }
 
@@ -16,11 +16,17 @@ public struct DockerCommandRuntime: ContainerRuntime {
     public func listContainers() async throws -> [ContainerSummary] {
         let data = try await commandRunner(["ps", "--all", "--format", "json"])
         let output = String(decoding: data, as: UTF8.self)
-        let records = try output
-            .split(whereSeparator: \.isNewline)
-            .map { line in
-                try JSONDecoder().decode(DockerContainerRecord.self, from: Data(line.utf8))
-            }
+        let records: [DockerContainerRecord]
+
+        do {
+            records = try output
+                .split(whereSeparator: \.isNewline)
+                .map { line in
+                    try JSONDecoder().decode(DockerContainerRecord.self, from: Data(line.utf8))
+                }
+        } catch {
+            throw ContainerRuntimeDataError.invalidRuntimeJSON(context: "Docker container list")
+        }
 
         return records.map {
             ContainerSummary(
@@ -84,10 +90,14 @@ public struct DockerCommandRuntime: ContainerRuntime {
     }
 
     public static func runDockerCommand(arguments: [String]) async throws -> Data {
-        try await runCommand(commandName: "docker", arguments: arguments)
+        try await runCommand(commandName: "docker", runtimeName: "Docker", arguments: arguments)
     }
 
-    public static func runCommand(commandName: String, arguments: [String]) async throws -> Data {
+    public static func runCommand(
+        commandName: String,
+        runtimeName: String = "Docker",
+        arguments: [String]
+    ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let outputPipe = Pipe()
@@ -104,7 +114,11 @@ public struct DockerCommandRuntime: ContainerRuntime {
 
                 guard process.terminationStatus == 0 else {
                     let message = String(decoding: errorData, as: UTF8.self)
-                    continuation.resume(throwing: DockerCommandRuntimeError.commandFailed(message: message.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    continuation.resume(throwing: ContainerRuntimeCommandFailure(
+                        runtimeName: runtimeName,
+                        operation: ContainerRuntimeOperation(arguments: arguments),
+                        message: message
+                    ))
                     return
                 }
 
@@ -114,7 +128,11 @@ public struct DockerCommandRuntime: ContainerRuntime {
             do {
                 try process.run()
             } catch {
-                continuation.resume(throwing: DockerCommandRuntimeError.commandFailed(message: error.localizedDescription))
+                continuation.resume(throwing: ContainerRuntimeCommandFailure(
+                    runtimeName: runtimeName,
+                    operation: ContainerRuntimeOperation(arguments: arguments),
+                    message: error.localizedDescription
+                ))
             }
         }
     }
@@ -133,18 +151,5 @@ private struct DockerContainerRecord: Decodable {
         case image = "Image"
         case state = "State"
         case status = "Status"
-    }
-}
-
-private enum DockerCommandRuntimeError: LocalizedError {
-    case commandFailed(message: String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .commandFailed(message) where !message.isEmpty:
-            return message
-        case .commandFailed:
-            return "Unable to run Docker command"
-        }
     }
 }
