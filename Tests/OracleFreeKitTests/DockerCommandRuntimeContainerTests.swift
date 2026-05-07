@@ -64,7 +64,43 @@ struct DockerCommandRuntimeContainerTests {
             "--health-interval", "10s",
             "--health-timeout", "5s",
             "--health-retries", "10",
-            "--env", "ORACLE_PASSWORD=LocalPassword123",
+            "-e", "ORACLE_PASSWORD=LocalPassword123",
+            "ghcr.io/gvenzl/oracle-free:slim"
+        ]])
+    }
+
+    @Test func dockerRuntimeOmitsVolumeOptionWhenVolumeNameIsEmpty() async throws {
+        let configuration = OracleContainerConfiguration(
+            containerName: "oracle-dev",
+            image: "ghcr.io/gvenzl/oracle-free:slim",
+            databasePort: 1521,
+            hostPort: 11521,
+            volumeName: "",
+            healthCheck: ContainerHealthCheckConfiguration(
+                command: "healthcheck.sh",
+                interval: "10s",
+                timeout: "5s",
+                retries: 10
+            ),
+            environmentVariables: [
+                ContainerEnvironmentVariable(name: "ORACLE_PASSWORD", value: "LocalPassword123")
+            ]
+        )
+        let recorder = CommandRecorder()
+        let runtime = DockerCommandRuntime(commandRunner: recorder.recordingRunner)
+
+        try await runtime.createContainer(configuration: configuration)
+
+        #expect(await recorder.recordedArguments == [[
+            "run",
+            "--detach",
+            "--name", "oracle-dev",
+            "--publish", "11521:1521",
+            "--health-cmd", "healthcheck.sh",
+            "--health-interval", "10s",
+            "--health-timeout", "5s",
+            "--health-retries", "10",
+            "-e", "ORACLE_PASSWORD=LocalPassword123",
             "ghcr.io/gvenzl/oracle-free:slim"
         ]])
     }
@@ -76,6 +112,15 @@ struct DockerCommandRuntimeContainerTests {
         try await runtime.startContainer(named: "oracle-free")
 
         #expect(await recorder.recordedArguments == [["start", "oracle-free"]])
+    }
+
+    @Test func dockerRuntimeDeletesVolume() async throws {
+        let recorder = CommandRecorder()
+        let runtime = DockerCommandRuntime(commandRunner: recorder.recordingRunner)
+
+        try await runtime.deleteVolume(named: "oracle-free-data")
+
+        #expect(await recorder.recordedArguments == [["volume", "rm", "--force", "oracle-free-data"]])
     }
 }
 

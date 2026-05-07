@@ -26,10 +26,19 @@ struct OracleInstanceServiceTests {
 
         let status = try await service.inspectInstance()
 
-        #expect(status == .stopped)
+        #expect(status == .stopped(OracleContainerDetails(
+            containerName: OracleContainerConfiguration.default.containerName,
+            image: OracleContainerConfiguration.default.image,
+            hostPort: OracleContainerConfiguration.default.hostPort,
+            databasePort: OracleContainerConfiguration.default.databasePort,
+            volumeName: OracleContainerConfiguration.default.volumeName,
+            state: "exited",
+            status: "Exited (0)",
+            connectionInfo: .default
+        )))
     }
 
-    @Test func serviceReportsReadyContainerWithConnectionInfo() async throws {
+    @Test func serviceReportsReadyContainerWithDetails() async throws {
         let runtime = FakeContainerRuntime(containers: [
             ContainerSummary(
                 id: "container-1",
@@ -43,7 +52,59 @@ struct OracleInstanceServiceTests {
 
         let status = try await service.inspectInstance()
 
-        #expect(status == .ready(OracleConnectionInfo.default))
+        #expect(status == .ready(.default))
+    }
+
+    @Test func serviceKeepsRunningContainerInStartingStateUntilHealthIsReady() async throws {
+        let runtime = FakeContainerRuntime(containers: [
+            ContainerSummary(
+                id: "container-1",
+                name: OracleContainerConfiguration.default.containerName,
+                image: OracleContainerConfiguration.default.image,
+                state: "running",
+                status: "Up 30 seconds (health: starting)"
+            )
+        ])
+        let service = OracleInstanceService(runtime: runtime, configuration: .default)
+
+        let status = try await service.inspectInstance()
+
+        #expect(status == .running(OracleContainerDetails(
+            containerName: OracleContainerConfiguration.default.containerName,
+            image: OracleContainerConfiguration.default.image,
+            hostPort: OracleContainerConfiguration.default.hostPort,
+            databasePort: OracleContainerConfiguration.default.databasePort,
+            volumeName: OracleContainerConfiguration.default.volumeName,
+            state: "running",
+            status: "Up 30 seconds (health: starting)",
+            connectionInfo: .default
+        )))
+    }
+
+    @Test func serviceDoesNotTreatUnhealthyContainerAsReady() async throws {
+        let runtime = FakeContainerRuntime(containers: [
+            ContainerSummary(
+                id: "container-1",
+                name: OracleContainerConfiguration.default.containerName,
+                image: OracleContainerConfiguration.default.image,
+                state: "running",
+                status: "unhealthy"
+            )
+        ])
+        let service = OracleInstanceService(runtime: runtime, configuration: .default)
+
+        let status = try await service.inspectInstance()
+
+        #expect(status == .running(OracleContainerDetails(
+            containerName: OracleContainerConfiguration.default.containerName,
+            image: OracleContainerConfiguration.default.image,
+            hostPort: OracleContainerConfiguration.default.hostPort,
+            databasePort: OracleContainerConfiguration.default.databasePort,
+            volumeName: OracleContainerConfiguration.default.volumeName,
+            state: "running",
+            status: "unhealthy",
+            connectionInfo: .default
+        )))
     }
 
     @Test func serviceStartsContainerThroughRuntime() async throws {
@@ -76,14 +137,42 @@ struct OracleInstanceServiceTests {
         #expect(recordedStops == [OracleContainerConfiguration.default.containerName])
     }
 
-    @Test func serviceDeletesContainerThroughRuntime() async throws {
+    @Test func serviceDeletesContainerAndVolumeThroughRuntime() async throws {
         let runtime = FakeContainerRuntime(containers: [])
         let service = OracleInstanceService(runtime: runtime, configuration: .default)
 
         try await service.deleteInstance()
 
         let recordedDeletes = await runtime.deletedContainerNames
+        let recordedVolumeDeletes = await runtime.deletedVolumeNames
         #expect(recordedDeletes == [OracleContainerConfiguration.default.containerName])
+        #expect(recordedVolumeDeletes == [OracleContainerConfiguration.default.volumeName])
+    }
+
+    @Test func serviceSkipsVolumeDeleteWhenVolumeNameIsEmpty() async throws {
+        let configuration = OracleContainerConfiguration(
+            containerName: "oracle-dev",
+            image: "ghcr.io/gvenzl/oracle-free",
+            databasePort: 1521,
+            hostPort: 11521,
+            volumeName: "",
+            healthCheck: ContainerHealthCheckConfiguration(
+                command: "healthcheck.sh",
+                interval: "10s",
+                timeout: "5s",
+                retries: 10
+            ),
+            environmentVariables: []
+        )
+        let runtime = FakeContainerRuntime(containers: [])
+        let service = OracleInstanceService(runtime: runtime, configuration: configuration)
+
+        try await service.deleteInstance()
+
+        let recordedDeletes = await runtime.deletedContainerNames
+        let recordedVolumeDeletes = await runtime.deletedVolumeNames
+        #expect(recordedDeletes == ["oracle-dev"])
+        #expect(recordedVolumeDeletes == [])
     }
 }
 
@@ -92,6 +181,7 @@ private actor FakeContainerRuntime: ContainerRuntime {
     private(set) var startedContainerNames: [String] = []
     private(set) var stoppedContainerNames: [String] = []
     private(set) var deletedContainerNames: [String] = []
+    private(set) var deletedVolumeNames: [String] = []
     private(set) var createdConfigurations: [OracleContainerConfiguration] = []
 
     init(containers: [ContainerSummary]) {
@@ -116,5 +206,9 @@ private actor FakeContainerRuntime: ContainerRuntime {
 
     func deleteContainer(named name: String) async throws {
         deletedContainerNames.append(name)
+    }
+
+    func deleteVolume(named name: String) async throws {
+        deletedVolumeNames.append(name)
     }
 }

@@ -18,7 +18,10 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "OracleFreeKit"
+            name: "OracleFreeKit",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .executableTarget(
             name: "OracleFreeApp",

@@ -64,15 +64,52 @@ struct RootViewTests {
         #expect(output.contains("RuntimeSelectionView"))
     }
 
-    @Test func rootViewRoutesSingleRuntimeToOracleLifecycle() async {
-        let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.oneRuntimeAvailable(.podman))))
+    @Test func rootViewRoutesDockerRuntimeToOracleLifecycle() async {
+        let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.oneRuntimeAvailable(.docker))))
         let oracleViewModel = OracleInstanceViewModel(service: PreviewOracleInstanceService(status: .missing))
         await viewModel.loadRuntimes()
         let rootView = RootView(
             appViewModel: viewModel,
             selectionViewModel: MachineSelectionViewModel(),
-            runtimeSelectionViewModel: RuntimeSelectionViewModel(availableRuntimes: [.podman]),
+            runtimeSelectionViewModel: RuntimeSelectionViewModel(availableRuntimes: [.docker]),
             oracleInstanceViewModel: oracleViewModel
+        )
+
+        let output = String(describing: rootView.body)
+
+        #expect(output.contains("OracleInstanceView"))
+    }
+
+    @Test func rootViewRoutesPodmanRuntimeToMachineReadinessBeforeLifecycle() async {
+        let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.oneRuntimeAvailable(.podman))))
+        await viewModel.loadRuntimes()
+        let rootView = RootView(
+            appViewModel: viewModel,
+            selectionViewModel: MachineSelectionViewModel(),
+            runtimeSelectionViewModel: RuntimeSelectionViewModel(availableRuntimes: [.podman]),
+            oracleInstanceViewModel: OracleInstanceViewModel(service: PreviewOracleInstanceService(status: .missing))
+        )
+
+        let output = String(describing: rootView.body)
+
+        #expect(output.contains("PodmanMachineReadinessView"))
+    }
+
+    @Test func rootViewRoutesSelectedPodmanMachineToOracleLifecycle() async {
+        let machine = PodmanMachine(
+            id: "machine-default",
+            name: "podman-machine-default",
+            isRunning: true,
+            isDefault: true,
+            connectionName: "podman-machine-default-root"
+        )
+        let viewModel = AppViewModel(runtimeDetector: PreviewRuntimeDetector(result: .success(.oneRuntimeAvailable(.podman))))
+        await viewModel.loadRuntimes()
+        let rootView = RootView(
+            appViewModel: viewModel,
+            selectionViewModel: MachineSelectionViewModel(selectedMachine: machine),
+            runtimeSelectionViewModel: RuntimeSelectionViewModel(availableRuntimes: [.podman]),
+            oracleInstanceViewModel: OracleInstanceViewModel(service: PreviewOracleInstanceService(status: .missing))
         )
 
         let output = String(describing: rootView.body)
@@ -87,6 +124,8 @@ struct RootViewTests {
 
         #expect(output.contains("Oracle Database Free container has not been created yet"))
         #expect(output.contains("Create Oracle Database Free"))
+        #expect(output.contains("Configuration"))
+        #expect(!output.contains("Advanced Container Settings"))
     }
 
     @Test func oracleInstanceViewRendersReadyState() {
@@ -96,6 +135,21 @@ struct RootViewTests {
 
         #expect(output.contains("Oracle Database Free is ready"))
         #expect(output.contains("FREEPDB1"))
+        #expect(output.contains("Container"))
+        #expect(output.contains("OracleFreeAppIcon"))
+        #expect(output.contains("Running"))
+        #expect(output.contains("oracle-free"))
+        #expect(output.contains("1521:1521"))
+        #expect(output.contains("oracle-free-data"))
+        #expect(output.contains("running"))
+    }
+
+    @Test func oracleInstanceViewRendersNoVolumeWhenVolumeNameIsEmpty() {
+        let view = OracleInstanceView(viewModel: PreviewOracleInstanceViewModel(status: .ready(.noVolumePreview)))
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Volume: No volume defined"))
     }
 
     @Test func oracleInstanceViewRendersCreatingState() {
@@ -107,12 +161,63 @@ struct RootViewTests {
     }
 
     @Test func oracleInstanceViewRendersStoppedState() {
-        let view = OracleInstanceView(viewModel: PreviewOracleInstanceViewModel(status: .stopped))
+        let view = OracleInstanceView(viewModel: PreviewOracleInstanceViewModel(status: .stopped(.stoppedPreview)))
 
         let output = String(describing: view.body)
 
+        #expect(output.contains("Container"))
+        #expect(output.contains("OracleFreeAppIcon"))
+        #expect(output.contains("Stopped"))
+        #expect(output.contains("oracle-free"))
         #expect(output.contains("Start Oracle Database Free"))
         #expect(output.contains("Delete Oracle Database Free"))
+    }
+
+    @Test func oracleInstanceViewRendersRunningStateWithContainerDetails() {
+        let view = OracleInstanceView(viewModel: PreviewOracleInstanceViewModel(status: .running(.default)))
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Oracle Database Free is starting"))
+        #expect(output.contains("Container"))
+        #expect(output.contains("OracleFreeAppIcon"))
+        #expect(output.contains("Starting"))
+        #expect(output.contains("oracle-free"))
+    }
+
+    @Test func podmanMachineReadinessViewRendersLoadingState() {
+        let view = PodmanMachineReadinessView(viewModel: MachineSelectionViewModel())
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Loading Podman machines"))
+    }
+
+    @Test func podmanMachineReadinessViewRendersNoMachinesState() async {
+        let runtime = EmptyMachinePreviewRuntime()
+        let viewModel = MachineSelectionViewModel(runtime: runtime)
+        await viewModel.loadMachines()
+        let view = PodmanMachineReadinessView(viewModel: viewModel)
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("No Podman machines found"))
+    }
+
+    @Test func podmanMachineReadinessViewRendersStoppedMachineState() {
+        let machine = PodmanMachine(
+            id: "machine-default",
+            name: "podman-machine-default",
+            isRunning: false,
+            isDefault: true,
+            connectionName: "podman-machine-default-root"
+        )
+        let view = PodmanMachineReadinessView(viewModel: MachineSelectionViewModel(selectedMachine: machine))
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Podman machine is stopped"))
+        #expect(output.contains("podman-machine-default"))
     }
 }
 
@@ -139,23 +244,62 @@ private struct PreviewError: LocalizedError {
     }
 }
 
+private extension OracleContainerDetails {
+    static let stoppedPreview = OracleContainerDetails(
+        containerName: OracleContainerConfiguration.default.containerName,
+        image: OracleContainerConfiguration.default.image,
+        hostPort: OracleContainerConfiguration.default.hostPort,
+        databasePort: OracleContainerConfiguration.default.databasePort,
+        volumeName: OracleContainerConfiguration.default.volumeName,
+        state: "exited",
+        status: "Exited (0)",
+        connectionInfo: .default
+    )
+
+    static let noVolumePreview = OracleContainerDetails(
+        containerName: OracleContainerConfiguration.default.containerName,
+        image: OracleContainerConfiguration.default.image,
+        hostPort: OracleContainerConfiguration.default.hostPort,
+        databasePort: OracleContainerConfiguration.default.databasePort,
+        volumeName: "",
+        state: "running",
+        status: "healthy",
+        connectionInfo: .default
+    )
+}
+
 private struct PreviewOracleInstanceService: OracleInstanceServicing {
     let status: OracleInstanceStatus
 
-    func inspectInstance() async throws -> OracleInstanceStatus {
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
         status
     }
 
-    func createInstance() async throws {}
-    func startInstance() async throws {}
-    func stopInstance() async throws {}
-    func deleteInstance() async throws {}
+    func createInstance(configuration: OracleContainerConfiguration) async throws {}
+    func startInstance(configuration: OracleContainerConfiguration) async throws {}
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {}
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
+}
+
+private struct EmptyMachinePreviewRuntime: PodmanRuntime {
+    func discoverMachines() async throws -> [PodmanMachine] {
+        []
+    }
+
+    func startMachine(named name: String) async throws {}
+    func listContainers() async throws -> [ContainerSummary] { [] }
+    func createContainer(configuration: OracleContainerConfiguration) async throws {}
+    func startContainer(named name: String) async throws {}
+    func stopContainer(named name: String) async throws {}
+    func deleteContainer(named name: String) async throws {}
+    func deleteVolume(named name: String) async throws {}
 }
 
 @MainActor
 @Observable
 private final class PreviewOracleInstanceViewModel: OracleInstanceViewing {
     let status: OracleInstanceStatus
+    var containerSettings: OracleContainerSettings = .default
 
     init(status: OracleInstanceStatus) {
         self.status = status

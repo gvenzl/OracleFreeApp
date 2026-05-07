@@ -25,20 +25,5 @@ public struct OracleContainerConfiguration: Equatable, Sendable {
         self.environmentVariables = environmentVariables
     }
 
-    public static let `default` = OracleContainerConfiguration(
-        containerName: "oracle-free",
-        image: "ghcr.io/gvenzl/oracle-free",
-        databasePort: 1521,
-        hostPort: 1521,
-        volumeName: "oracle-free-data",
-        healthCheck: ContainerHealthCheckConfiguration(
-            command: "healthcheck.sh",
-            interval: "10s",
-            timeout: "5s",
-            retries: 10
-        ),
-        environmentVariables: [
-            ContainerEnvironmentVariable(name: "ORACLE_PASSWORD", value: "OracleFree123")
-        ]
-    )
+    public static let `default` = OracleContainerSettings.default.containerConfiguration()
 }

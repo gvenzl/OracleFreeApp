@@ -5,17 +5,20 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
     private let selectionViewModel: MachineSelectionViewModel
     private let runtimeSelectionViewModel: RuntimeSelectionViewModel
     private let oracleInstanceViewModel: OracleViewModel
+    private let openConfiguration: @MainActor () -> Void
 
     public init(
         appViewModel: AppViewModel,
         selectionViewModel: MachineSelectionViewModel,
         runtimeSelectionViewModel: RuntimeSelectionViewModel,
-        oracleInstanceViewModel: OracleViewModel
+        oracleInstanceViewModel: OracleViewModel,
+        openConfiguration: @escaping @MainActor () -> Void = {}
     ) {
         self.appViewModel = appViewModel
         self.selectionViewModel = selectionViewModel
         self.runtimeSelectionViewModel = runtimeSelectionViewModel
         self.oracleInstanceViewModel = oracleInstanceViewModel
+        self.openConfiguration = openConfiguration
     }
 
     @ViewBuilder
@@ -43,14 +46,40 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
                 Text("No supported container runtime found")
                 Text("Install a supported runtime such as Podman or Docker, then try again.")
             }
-        case .oneRuntimeAvailable:
-            OracleInstanceView(viewModel: oracleInstanceViewModel)
+        case let .oneRuntimeAvailable(runtime):
+            selectedRuntimeView(for: runtime)
         case .multipleRuntimesAvailable:
-            if runtimeSelectionViewModel.selection != nil {
-                OracleInstanceView(viewModel: oracleInstanceViewModel)
+            if let runtime = runtimeSelectionViewModel.selectedRuntime {
+                selectedRuntimeView(for: runtime)
             } else {
                 RuntimeSelectionView(viewModel: runtimeSelectionViewModel)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func selectedRuntimeView(for runtime: ContainerRuntimeKind) -> some View {
+        switch runtime {
+        case .podman:
+            podmanRuntimeView()
+        case .docker:
+            OracleInstanceView(
+                viewModel: oracleInstanceViewModel,
+                openConfiguration: openConfiguration
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func podmanRuntimeView() -> some View {
+        switch selectionViewModel.status {
+        case .selected:
+            OracleInstanceView(
+                viewModel: oracleInstanceViewModel,
+                openConfiguration: openConfiguration
+            )
+        default:
+            PodmanMachineReadinessView(viewModel: selectionViewModel)
         }
     }
 }

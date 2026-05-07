@@ -12,8 +12,8 @@ struct OracleInstanceViewModelTests {
     }
 
     @Test func oracleInstanceViewModelStartsInstanceAndRefreshesStatus() async throws {
-        let service = FakeOracleInstanceService(status: .ready(.default))
-        let viewModel = OracleInstanceViewModel(service: service)
+        let service = SequenceOracleInstanceService(statuses: [.running(.default), .ready(.default)])
+        let viewModel = Self.makeViewModel(service: service)
 
         await viewModel.startInstance()
 
@@ -22,18 +22,47 @@ struct OracleInstanceViewModelTests {
     }
 
     @Test func oracleInstanceViewModelCreatesInstanceAndRefreshesStatus() async throws {
-        let service = FakeOracleInstanceService(status: .running)
-        let viewModel = OracleInstanceViewModel(service: service)
+        let service = SequenceOracleInstanceService(statuses: [.running(.default), .ready(.default)])
+        let viewModel = Self.makeViewModel(service: service)
 
         await viewModel.createInstance()
 
         #expect(await service.createCallCount == 1)
-        #expect(viewModel.status == .running)
+        #expect(viewModel.status == .ready(.default))
+        #expect(await service.inspectCallCount == 2)
+    }
+
+    @Test func oracleInstanceViewModelCreatesWithCurrentSettingsAndKeepsOriginalConfiguration() async throws {
+        let service = RecordingOracleInstanceService()
+        let initialSettings = OracleContainerSettings(
+            image: "ghcr.io/gvenzl/oracle-free:slim",
+            containerName: "oracle-dev",
+            hostPort: 11521,
+            volumeName: "oracle-dev-data",
+            password: "LocalPassword123",
+            extraEnvironmentVariables: []
+        )
+        let replacementSettings = OracleContainerSettings(
+            image: "ghcr.io/gvenzl/oracle-free:full",
+            containerName: "oracle-next",
+            hostPort: 21521,
+            volumeName: "oracle-next-data",
+            password: "NextPassword123",
+            extraEnvironmentVariables: []
+        )
+        let viewModel = Self.makeViewModel(service: service, settings: initialSettings, maximumReadinessChecks: 1)
+
+        await viewModel.createInstance()
+        viewModel.containerSettings = replacementSettings
+        await viewModel.deleteInstance()
+
+        #expect(await service.createdConfigurations == [initialSettings.containerConfiguration()])
+        #expect(await service.deletedConfigurations == [initialSettings.containerConfiguration()])
     }
 
     @Test func oracleInstanceViewModelShowsCreatingStateWhileCreateIsRunning() async throws {
-        let service = SuspendedCreateOracleInstanceService(statusAfterCreate: .running)
-        let viewModel = OracleInstanceViewModel(service: service)
+        let service = SuspendedCreateOracleInstanceService(statusAfterCreate: .running(.default))
+        let viewModel = Self.makeViewModel(service: service, maximumReadinessChecks: 1)
 
         let task = Task {
             await viewModel.createInstance()
@@ -45,17 +74,37 @@ struct OracleInstanceViewModelTests {
         await service.finishCreate()
         await task.value
 
-        #expect(viewModel.status == .running)
+        #expect(viewModel.status == .running(.default))
     }
 
     @Test func oracleInstanceViewModelStopsInstanceAndRefreshesStatus() async throws {
-        let service = FakeOracleInstanceService(status: .stopped)
+        let service = FakeOracleInstanceService(status: .stopped(.default))
         let viewModel = OracleInstanceViewModel(service: service)
 
         await viewModel.stopInstance()
 
         #expect(await service.stopCallCount == 1)
-        #expect(viewModel.status == .stopped)
+        #expect(viewModel.status == .stopped(.default))
+    }
+
+    @Test func oracleInstanceViewModelStopsReadyInstanceBeforeTermination() async throws {
+        let service = FakeOracleInstanceService(status: .ready(.default))
+        let viewModel = OracleInstanceViewModel(service: service)
+
+        await viewModel.loadStatus()
+        await viewModel.stopInstanceBeforeTermination()
+
+        #expect(await service.stopCallCount == 1)
+    }
+
+    @Test func oracleInstanceViewModelDoesNotStopMissingInstanceBeforeTermination() async throws {
+        let service = FakeOracleInstanceService(status: .missing)
+        let viewModel = OracleInstanceViewModel(service: service)
+
+        await viewModel.loadStatus()
+        await viewModel.stopInstanceBeforeTermination()
+
+        #expect(await service.stopCallCount == 0)
     }
 
     @Test func oracleInstanceViewModelDeletesInstanceAndRefreshesStatus() async throws {
@@ -66,6 +115,19 @@ struct OracleInstanceViewModelTests {
 
         #expect(await service.deleteCallCount == 1)
         #expect(viewModel.status == .missing)
+    }
+
+    private static func makeViewModel(
+        service: any OracleInstanceServicing,
+        settings: OracleContainerSettings = .default,
+        maximumReadinessChecks: Int = 3
+    ) -> OracleInstanceViewModel {
+        OracleInstanceViewModel(
+            service: service,
+            containerSettings: settings,
+            maximumReadinessChecks: maximumReadinessChecks,
+            readinessCheckDelay: {}
+        )
     }
 }
 
@@ -80,24 +142,75 @@ private actor FakeOracleInstanceService: OracleInstanceServicing {
         self.nextStatus = status
     }
 
-    func inspectInstance() async throws -> OracleInstanceStatus {
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
         nextStatus
     }
 
-    func createInstance() async throws {
+    func createInstance(configuration: OracleContainerConfiguration) async throws {
         createCallCount += 1
     }
 
-    func startInstance() async throws {
+    func startInstance(configuration: OracleContainerConfiguration) async throws {
         startCallCount += 1
     }
 
-    func stopInstance() async throws {
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {
         stopCallCount += 1
     }
 
-    func deleteInstance() async throws {
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {
         deleteCallCount += 1
+    }
+}
+
+private actor SequenceOracleInstanceService: OracleInstanceServicing {
+    private var statuses: [OracleInstanceStatus]
+    private(set) var inspectCallCount = 0
+    private(set) var createCallCount = 0
+    private(set) var startCallCount = 0
+
+    init(statuses: [OracleInstanceStatus]) {
+        self.statuses = statuses
+    }
+
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
+        inspectCallCount += 1
+        guard statuses.count > 1 else {
+            return statuses[0]
+        }
+
+        return statuses.removeFirst()
+    }
+
+    func createInstance(configuration: OracleContainerConfiguration) async throws {
+        createCallCount += 1
+    }
+
+    func startInstance(configuration: OracleContainerConfiguration) async throws {
+        startCallCount += 1
+    }
+
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {}
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
+}
+
+private actor RecordingOracleInstanceService: OracleInstanceServicing {
+    private(set) var createdConfigurations: [OracleContainerConfiguration] = []
+    private(set) var deletedConfigurations: [OracleContainerConfiguration] = []
+
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
+        .missing
+    }
+
+    func createInstance(configuration: OracleContainerConfiguration) async throws {
+        createdConfigurations.append(configuration)
+    }
+
+    func startInstance(configuration: OracleContainerConfiguration) async throws {}
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {}
+
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {
+        deletedConfigurations.append(configuration)
     }
 }
 
@@ -126,11 +239,11 @@ private actor SuspendedCreateOracleInstanceService: OracleInstanceServicing {
         finishCreateContinuation = nil
     }
 
-    func inspectInstance() async throws -> OracleInstanceStatus {
+    func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
         statusAfterCreate
     }
 
-    func createInstance() async throws {
+    func createInstance(configuration: OracleContainerConfiguration) async throws {
         await withCheckedContinuation { continuation in
             finishCreateContinuation = continuation
             createStarted = true
@@ -139,7 +252,7 @@ private actor SuspendedCreateOracleInstanceService: OracleInstanceServicing {
         }
     }
 
-    func startInstance() async throws {}
-    func stopInstance() async throws {}
-    func deleteInstance() async throws {}
+    func startInstance(configuration: OracleContainerConfiguration) async throws {}
+    func stopInstance(configuration: OracleContainerConfiguration) async throws {}
+    func deleteInstance(configuration: OracleContainerConfiguration) async throws {}
 }

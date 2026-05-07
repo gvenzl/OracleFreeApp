@@ -17,9 +17,13 @@ public struct PodmanCommandRuntime: PodmanRuntime {
                 name: $0.name,
                 isRunning: $0.running,
                 isDefault: $0.defaultMachine,
-                connectionName: $0.connectionName
+                connectionName: $0.connectionName ?? $0.name
             )
         }
+    }
+
+    public func startMachine(named name: String) async throws {
+        _ = try await commandRunner(["machine", "start", name])
     }
 
     public func listContainers() async throws -> [ContainerSummary] {
@@ -42,8 +46,15 @@ public struct PodmanCommandRuntime: PodmanRuntime {
             "run",
             "--detach",
             "--name", configuration.containerName,
-            "--publish", "\(configuration.hostPort):\(configuration.databasePort)",
-            "--volume", "\(configuration.volumeName):/opt/oracle/oradata",
+            "--publish", "\(configuration.hostPort):\(configuration.databasePort)"
+        ]
+
+        let volumeName = configuration.volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !volumeName.isEmpty {
+            arguments += ["--volume", "\(volumeName):/opt/oracle/oradata"]
+        }
+
+        arguments += [
             "--health-cmd", configuration.healthCheck.command,
             "--health-interval", configuration.healthCheck.interval,
             "--health-timeout", configuration.healthCheck.timeout,
@@ -51,7 +62,7 @@ public struct PodmanCommandRuntime: PodmanRuntime {
         ]
 
         for environmentVariable in configuration.environmentVariables {
-            arguments += ["--env", environmentVariable.assignment]
+            arguments += ["-e", environmentVariable.assignment]
         }
 
         arguments.append(configuration.image)
@@ -69,6 +80,10 @@ public struct PodmanCommandRuntime: PodmanRuntime {
 
     public func deleteContainer(named name: String) async throws {
         _ = try await commandRunner(["rm", "--force", name])
+    }
+
+    public func deleteVolume(named name: String) async throws {
+        _ = try await commandRunner(["volume", "rm", "--force", name])
     }
 
     public static func runPodmanCommand(arguments: [String]) async throws -> Data {
@@ -108,7 +123,7 @@ private struct PodmanMachineRecord: Decodable {
     let name: String
     let running: Bool
     let defaultMachine: Bool
-    let connectionName: String
+    let connectionName: String?
 
     enum CodingKeys: String, CodingKey {
         case name = "Name"

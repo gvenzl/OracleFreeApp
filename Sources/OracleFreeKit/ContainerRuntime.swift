@@ -4,4 +4,5 @@ public protocol ContainerRuntime: Sendable {
     func startContainer(named name: String) async throws
     func stopContainer(named name: String) async throws
     func deleteContainer(named name: String) async throws
+    func deleteVolume(named name: String) async throws
 }

@@ -32,8 +32,15 @@ public struct DockerCommandRuntime: ContainerRuntime {
             "run",
             "--detach",
             "--name", configuration.containerName,
-            "--publish", "\(configuration.hostPort):\(configuration.databasePort)",
-            "--volume", "\(configuration.volumeName):/opt/oracle/oradata",
+            "--publish", "\(configuration.hostPort):\(configuration.databasePort)"
+        ]
+
+        let volumeName = configuration.volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !volumeName.isEmpty {
+            arguments += ["--volume", "\(volumeName):/opt/oracle/oradata"]
+        }
+
+        arguments += [
             "--health-cmd", configuration.healthCheck.command,
             "--health-interval", configuration.healthCheck.interval,
             "--health-timeout", configuration.healthCheck.timeout,
@@ -41,7 +48,7 @@ public struct DockerCommandRuntime: ContainerRuntime {
         ]
 
         for environmentVariable in configuration.environmentVariables {
-            arguments += ["--env", environmentVariable.assignment]
+            arguments += ["-e", environmentVariable.assignment]
         }
 
         arguments.append(configuration.image)
@@ -59,6 +66,10 @@ public struct DockerCommandRuntime: ContainerRuntime {
 
     public func deleteContainer(named name: String) async throws {
         _ = try await commandRunner(["rm", "--force", name])
+    }
+
+    public func deleteVolume(named name: String) async throws {
+        _ = try await commandRunner(["volume", "rm", "--force", name])
     }
 
     public static func runDockerCommand(arguments: [String]) async throws -> Data {
