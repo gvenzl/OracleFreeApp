@@ -4,6 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="OracleFreeApp"
 APP_DISPLAY_NAME="Oracle Free App"
+APP_VERSION="1.0.0"
 BUNDLE_ID="com.oraclefreeapp.OracleFreeApp"
 MIN_SYSTEM_VERSION="14.0"
 
@@ -16,6 +17,7 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/OracleFreeKit/Resources/OracleFreeAppIcon.icns"
+PACKAGE_ARCHIVE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION-unsigned.zip"
 
 cd "$ROOT_DIR"
 
@@ -47,6 +49,10 @@ cat >"$INFO_PLIST" <<PLIST
   <string>OracleFreeAppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>$APP_VERSION</string>
+  <key>CFBundleVersion</key>
+  <string>$APP_VERSION</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
@@ -55,8 +61,19 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+/usr/bin/plutil -lint "$INFO_PLIST" >/dev/null
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
+}
+
+package_app() {
+  rm -f "$PACKAGE_ARCHIVE"
+  (
+    cd "$DIST_DIR"
+    /usr/bin/ditto -c -k --norsrc --keepParent "$APP_DISPLAY_NAME.app" "$PACKAGE_ARCHIVE"
+  )
+  echo "$PACKAGE_ARCHIVE"
 }
 
 case "$MODE" in
@@ -79,8 +96,11 @@ case "$MODE" in
     sleep 1
     pgrep -x "$APP_NAME" >/dev/null
     ;;
+  --package|package)
+    package_app
+    ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--package]" >&2
     exit 2
     ;;
 esac

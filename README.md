@@ -32,7 +32,10 @@ Useful variants:
 ./script/build_and_run.sh --logs
 ./script/build_and_run.sh --telemetry
 ./script/build_and_run.sh --debug
+./script/build_and_run.sh --package
 ```
+
+The `--package` mode creates an unsigned archive at `dist/Oracle Free App-1.0.0-unsigned.zip`. This is useful for local bundle validation and handoff, but it is not signed, notarized, or ready for Gatekeeper distribution.
 
 ## Default Container Configuration
 
