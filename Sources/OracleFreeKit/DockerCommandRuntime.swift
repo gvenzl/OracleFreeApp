@@ -1,15 +1,23 @@
 import Foundation
 
 public struct DockerCommandRuntime: ContainerRuntime {
+    public let commandPath: String
+
     private let commandRunner: @Sendable ([String]) async throws -> Data
 
     public init(commandName: String = "docker", runtimeName: String = "Docker") {
+        self.init(commandPath: commandName, runtimeName: runtimeName)
+    }
+
+    public init(commandPath: String, runtimeName: String = "Docker") {
+        self.commandPath = commandPath
         self.commandRunner = { arguments in
-            try await Self.runCommand(commandName: commandName, runtimeName: runtimeName, arguments: arguments)
+            try await Self.runCommand(commandPath: commandPath, runtimeName: runtimeName, arguments: arguments)
         }
     }
 
     public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data) {
+        self.commandPath = "<custom>"
         self.commandRunner = commandRunner
     }
 
@@ -90,11 +98,11 @@ public struct DockerCommandRuntime: ContainerRuntime {
     }
 
     public static func runDockerCommand(arguments: [String]) async throws -> Data {
-        try await runCommand(commandName: "docker", runtimeName: "Docker", arguments: arguments)
+        try await runCommand(commandPath: "docker", runtimeName: "Docker", arguments: arguments)
     }
 
     public static func runCommand(
-        commandName: String,
+        commandPath: String,
         runtimeName: String = "Docker",
         arguments: [String]
     ) async throws -> Data {
@@ -103,8 +111,13 @@ public struct DockerCommandRuntime: ContainerRuntime {
             let outputPipe = Pipe()
             let errorPipe = Pipe()
 
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = [commandName] + arguments
+            if commandPath.hasPrefix("/") {
+                process.executableURL = URL(fileURLWithPath: commandPath)
+                process.arguments = arguments
+            } else {
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = [commandPath] + arguments
+            }
             process.standardOutput = outputPipe
             process.standardError = errorPipe
 

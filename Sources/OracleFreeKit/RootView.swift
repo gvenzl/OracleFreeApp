@@ -46,7 +46,7 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
                 Text("No supported container runtime found")
                 Text("Install Docker, Podman, or Rancher Desktop, then try again.")
             }
-        case let .oneRuntimeAvailable(runtime):
+        case let .oneRuntimeAvailable(runtime, _):
             selectedRuntimeView(for: runtime, canChangeRuntime: false)
         case .multipleRuntimesAvailable:
             if let runtime = runtimeSelectionViewModel.selectedRuntime {

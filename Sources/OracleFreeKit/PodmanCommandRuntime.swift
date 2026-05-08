@@ -1,9 +1,19 @@
 import Foundation
 
 public struct PodmanCommandRuntime: PodmanRuntime {
+    public let commandPath: String
+
     private let commandRunner: @Sendable ([String]) async throws -> Data
 
-    public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data = Self.runPodmanCommand) {
+    public init(commandPath: String = "podman") {
+        self.commandPath = commandPath
+        self.commandRunner = { arguments in
+            try await Self.runPodmanCommand(commandPath: commandPath, arguments: arguments)
+        }
+    }
+
+    public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data) {
+        self.commandPath = "<custom>"
         self.commandRunner = commandRunner
     }
 
@@ -104,13 +114,22 @@ public struct PodmanCommandRuntime: PodmanRuntime {
     }
 
     public static func runPodmanCommand(arguments: [String]) async throws -> Data {
+        try await runPodmanCommand(commandPath: "podman", arguments: arguments)
+    }
+
+    public static func runPodmanCommand(commandPath: String, arguments: [String]) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             let outputPipe = Pipe()
             let errorPipe = Pipe()
 
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["podman"] + arguments
+            if commandPath.hasPrefix("/") {
+                process.executableURL = URL(fileURLWithPath: commandPath)
+                process.arguments = arguments
+            } else {
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = [commandPath] + arguments
+            }
             process.standardOutput = outputPipe
             process.standardError = errorPipe
 

@@ -1,4 +1,4 @@
-public enum ContainerRuntimeKind: String, CaseIterable, Equatable, Sendable {
+public enum ContainerRuntimeKind: String, CaseIterable, Equatable, Hashable, Sendable {
     case docker
     case podman
     case rancherDesktop

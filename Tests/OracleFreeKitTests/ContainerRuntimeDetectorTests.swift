@@ -21,7 +21,24 @@ struct ContainerRuntimeDetectorTests {
 
         let status = try await detector.detectInstalledRuntimes()
 
-        #expect(status == .oneRuntimeAvailable(.podman))
+        #expect(status == .oneRuntimeAvailable(
+            .podman,
+            executablePaths: ContainerRuntimeExecutablePaths(pathsByExecutableName: [
+                "podman": "/opt/homebrew/bin/podman"
+            ])
+        ))
+    }
+
+    @Test func detectorIncludesResolvedExecutablePathsForAvailableRuntimes() async throws {
+        let detector = DefaultContainerRuntimeDetector(
+            lookupExecutableNamed: { executableName in
+                executableName == "podman" ? "/opt/homebrew/bin/podman" : nil
+            }
+        )
+
+        let status = try await detector.detectInstalledRuntimes()
+
+        #expect(status.executablePaths(for: .podman)?.path(for: "podman") == "/opt/homebrew/bin/podman")
     }
 
     @Test func detectorReportsMultipleInstalledRuntimes() async throws {
@@ -44,7 +61,25 @@ struct ContainerRuntimeDetectorTests {
 
         let status = try await detector.detectInstalledRuntimes()
 
-        #expect(status == .multipleRuntimesAvailable([.docker, .podman, .rancherDesktop]))
+        #expect(status == .multipleRuntimesAvailable(
+            [.docker, .podman, .rancherDesktop],
+            executablePathsByRuntime: [
+                .docker: ContainerRuntimeExecutablePaths(pathsByExecutableName: [
+                    "docker": "/Applications/Docker.app/Contents/Resources/bin/docker"
+                ]),
+                .podman: ContainerRuntimeExecutablePaths(pathsByExecutableName: [
+                    "podman": "/opt/homebrew/bin/podman"
+                ]),
+                .rancherDesktop: ContainerRuntimeExecutablePaths(pathsByExecutableName: [
+                    "rdctl": "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl",
+                    "nerdctl": "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+                ])
+            ]
+        ))
+        #expect(
+            status.executablePaths(for: .rancherDesktop)?.path(for: "nerdctl") ==
+                "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+        )
     }
 
     @Test func detectorReportsRancherDesktopWhenRancherDesktopCommandsAreInstalled() async throws {
@@ -63,7 +98,13 @@ struct ContainerRuntimeDetectorTests {
 
         let status = try await detector.detectInstalledRuntimes()
 
-        #expect(status == .oneRuntimeAvailable(.rancherDesktop))
+        #expect(status == .oneRuntimeAvailable(
+            .rancherDesktop,
+            executablePaths: ContainerRuntimeExecutablePaths(pathsByExecutableName: [
+                "rdctl": "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl",
+                "nerdctl": "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+            ])
+        ))
     }
 
     @Test func detectorDoesNotReportRancherDesktopWhenNerdctlIsMissing() async throws {
@@ -76,5 +117,15 @@ struct ContainerRuntimeDetectorTests {
         let status = try await detector.detectInstalledRuntimes()
 
         #expect(status == .noSupportedRuntimeInstalled)
+    }
+
+    @Test func defaultLookupSearchesCommonMacOSInstallLocations() {
+        #expect(DefaultContainerRuntimeDetector.candidateExecutablePaths(named: "podman").contains("/opt/homebrew/bin/podman"))
+        #expect(DefaultContainerRuntimeDetector.candidateExecutablePaths(named: "docker").contains("/Applications/Docker.app/Contents/Resources/bin/docker"))
+        #expect(
+            DefaultContainerRuntimeDetector.candidateExecutablePaths(named: "nerdctl").contains(
+                "/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl"
+            )
+        )
     }
 }

@@ -1,16 +1,20 @@
 import Foundation
 
 public struct RancherDesktopCommandRuntime: ContainerRuntime {
+    public let commandPath: String
+
     private let dockerCompatibleRuntime: DockerCommandRuntime
 
-    public init() {
+    public init(commandPath: String = "nerdctl") {
+        self.commandPath = commandPath
         self.dockerCompatibleRuntime = DockerCommandRuntime(
-            commandName: "nerdctl",
+            commandPath: commandPath,
             runtimeName: "Rancher Desktop"
         )
     }
 
     public init(commandRunner: @escaping @Sendable ([String]) async throws -> Data) {
+        self.commandPath = "<custom>"
         self.dockerCompatibleRuntime = DockerCommandRuntime(commandRunner: commandRunner)
     }
 

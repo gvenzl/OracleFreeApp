@@ -22,4 +22,12 @@ public final class AppViewModel {
             status = .failed(message: message)
         }
     }
+
+    public func executablePaths(for runtime: ContainerRuntimeKind) -> ContainerRuntimeExecutablePaths {
+        guard case let .runtimeAvailability(status) = status else {
+            return .empty
+        }
+
+        return status.executablePaths(for: runtime) ?? .empty
+    }
 }

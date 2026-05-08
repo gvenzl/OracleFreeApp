@@ -8,11 +8,20 @@ struct OracleFreeMacOSApp: App {
     @State private var appViewModel = AppViewModel(runtimeDetector: DefaultContainerRuntimeDetector())
     @State private var selectionViewModel = MachineSelectionViewModel()
     @State private var runtimeSelectionViewModel = RuntimeSelectionViewModel(availableRuntimes: ContainerRuntimeKind.allCases)
-    @State private var oracleInstanceViewModel = Self.makeOracleInstanceViewModel(for: .podman)
+    @State private var containerSettingsViewModel: OracleContainerSettingsViewModel
+    @State private var oracleInstanceViewModel: OracleInstanceViewModel
     @State private var showsConfigurationDialog = false
 
     private static let runtimeFactory = DefaultContainerRuntimeFactory()
-    private static let containerSettingsStore = OracleContainerSettingsStore()
+
+    init() {
+        let containerSettingsViewModel = OracleContainerSettingsViewModel()
+        self._containerSettingsViewModel = State(initialValue: containerSettingsViewModel)
+        self._oracleInstanceViewModel = State(initialValue: Self.makeOracleInstanceViewModel(
+            for: .podman,
+            containerSettings: containerSettingsViewModel.settings
+        ))
+    }
 
     var body: some Scene {
         WindowGroup(OracleFreeAppMetadata.displayName, id: OracleFreeWindowID.main) {
@@ -29,12 +38,28 @@ struct OracleFreeMacOSApp: App {
             .sheet(isPresented: $showsConfigurationDialog) {
                 OracleContainerConfigurationDialogView(
                     settings: Binding {
-                        oracleInstanceViewModel.containerSettings
+                        containerSettingsViewModel.settings
                     } set: { settings in
-                        oracleInstanceViewModel.containerSettings = settings
-                        Self.saveContainerSettings(settings)
+                        containerSettingsViewModel.updateSettings(settings)
+                        oracleInstanceViewModel.containerSettings = containerSettingsViewModel.settings
                     }
                 )
+            }
+            .alert(
+                "Configuration Warning",
+                isPresented: Binding {
+                    containerSettingsViewModel.warningMessage != nil
+                } set: { isPresented in
+                    if !isPresented {
+                        containerSettingsViewModel.clearWarning()
+                    }
+                }
+            ) {
+                Button("OK") {
+                    containerSettingsViewModel.clearWarning()
+                }
+            } message: {
+                Text(containerSettingsViewModel.warningMessage ?? "")
             }
             .task {
                 configureShutdownHandler()
@@ -98,11 +123,11 @@ struct OracleFreeMacOSApp: App {
         }
 
         switch runtimeAvailability {
-        case let .oneRuntimeAvailable(runtime):
+        case let .oneRuntimeAvailable(runtime, _):
             runtimeSelectionViewModel.updateAvailableRuntimes([runtime])
             configureRuntime(runtime)
             return runtime
-        case let .multipleRuntimesAvailable(availableRuntimes):
+        case let .multipleRuntimesAvailable(availableRuntimes, _):
             runtimeSelectionViewModel.updateAvailableRuntimes(availableRuntimes)
             if let selectedRuntime = runtimeSelectionViewModel.selectedRuntime {
                 configureRuntime(selectedRuntime)
@@ -117,7 +142,10 @@ struct OracleFreeMacOSApp: App {
     }
 
     private func configureRuntime(_ runtime: ContainerRuntimeKind) {
-        let containerRuntime = Self.runtimeFactory.makeRuntime(for: runtime)
+        let containerRuntime = Self.runtimeFactory.makeRuntime(
+            for: runtime,
+            executablePaths: appViewModel.executablePaths(for: runtime)
+        )
         let containerSettings = oracleInstanceViewModel.containerSettings
         oracleInstanceViewModel = OracleInstanceViewModel(
             service: OracleInstanceService(runtime: containerRuntime),
@@ -152,21 +180,16 @@ struct OracleFreeMacOSApp: App {
         }
     }
 
-    private static func makeOracleInstanceViewModel(for runtime: ContainerRuntimeKind) -> OracleInstanceViewModel {
+    private static func makeOracleInstanceViewModel(
+        for runtime: ContainerRuntimeKind,
+        containerSettings: OracleContainerSettings
+    ) -> OracleInstanceViewModel {
         OracleInstanceViewModel(
             service: OracleInstanceService(
                 runtime: runtimeFactory.makeRuntime(for: runtime)
             ),
-            containerSettings: loadContainerSettings()
+            containerSettings: containerSettings
         )
-    }
-
-    private static func loadContainerSettings() -> OracleContainerSettings {
-        (try? containerSettingsStore.loadSettings()) ?? .default
-    }
-
-    private static func saveContainerSettings(_ settings: OracleContainerSettings) {
-        try? containerSettingsStore.save(settings: settings)
     }
 
     private func configureShutdownHandler() {
