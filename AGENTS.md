@@ -105,15 +105,17 @@ cd /Users/gvenzl/git/OracleFreeApp
 ./script/build_and_run.sh --package
 ```
 
-`--package` creates an unsigned archive named `dist/Oracle Free App-1.0.0-unsigned.zip`.
-It is useful for local bundle validation, but it is not signed, notarized, or ready for Gatekeeper distribution.
+`--package` creates an archive named `dist/Oracle Free App-1.0.0-unsigned.zip`.
+The completed `.app` is ad hoc signed after `Info.plist` and resources are assembled so
+`codesign --verify --deep --strict` passes. It is useful for local bundle validation, but it is
+not Developer ID signed, notarized, or ready for Gatekeeper distribution.
 
 ### GitHub Actions
 
 CI workflows now live in `.github/workflows/`.
 
 - `tests.yml` runs `swift build` and `swift test` on `macos-15`.
-- `build-app.yml` runs `./script/build_and_run.sh --package` on `macos-15` and uploads the unsigned app archive as a workflow artifact.
+- `build-app.yml` runs `./script/build_and_run.sh --package` on `macos-15` and uploads the ad hoc signed, non-notarized app archive as a workflow artifact.
 
 Do not use `./script/build_and_run.sh --verify` in GitHub Actions unless the workflow is intentionally validating GUI launch behavior. The package mode builds the app bundle without launching the app, which is better suited to hosted CI.
 

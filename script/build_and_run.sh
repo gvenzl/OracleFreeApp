@@ -62,6 +62,8 @@ cat >"$INFO_PLIST" <<PLIST
 PLIST
 
 /usr/bin/plutil -lint "$INFO_PLIST" >/dev/null
+/usr/bin/codesign --force --deep --sign - "$APP_BUNDLE"
+/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

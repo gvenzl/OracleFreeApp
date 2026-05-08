@@ -14,4 +14,17 @@ struct BuildScriptPackagingTests {
         #expect(script.contains("--package|package"))
         #expect(script.contains("ditto -c -k --norsrc --keepParent"))
     }
+
+    @Test func buildScriptSignsCompletedAppBundleBeforePackaging() throws {
+        let script = try String(
+            contentsOfFile: "script/build_and_run.sh",
+            encoding: .utf8
+        )
+
+        let signCommand = "/usr/bin/codesign --force --deep --sign - \"$APP_BUNDLE\""
+        let signCommandIndex = try #require(script.range(of: signCommand)?.lowerBound)
+        let packageFunctionIndex = try #require(script.range(of: "package_app()")?.lowerBound)
+
+        #expect(signCommandIndex < packageFunctionIndex)
+    }
 }

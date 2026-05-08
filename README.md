@@ -2,8 +2,6 @@
 
 Oracle Free App is a macOS app for running Oracle Database Free in a local container. It detects supported container runtimes, creates and manages one Oracle Database Free container, and shows the connection details needed to use the database.
 
-The repository name and Swift package name remain `OracleFreeApp`.
-
 ## Requirements
 
 - macOS 14 or newer
@@ -37,7 +35,7 @@ Useful variants:
 ./script/build_and_run.sh --package
 ```
 
-The `--package` mode creates an unsigned archive at `dist/Oracle Free App-1.0.0-unsigned.zip`. This is useful for local bundle validation and handoff, but it is not signed, notarized, or ready for Gatekeeper distribution.
+The `--package` mode creates an archive at `dist/Oracle Free App-1.0.0-unsigned.zip`. The assembled `.app` is ad hoc signed so its bundle resources validate correctly, but it is not Developer ID signed, notarized, or ready for Gatekeeper distribution.
 
 ## Default Container Configuration
 
@@ -115,7 +113,7 @@ This project uses Swift Testing, not XCTest.
 GitHub Actions workflows are defined under `.github/workflows/`:
 
 - `tests.yml` runs `swift build` and `swift test`.
-- `build-app.yml` runs `./script/build_and_run.sh --package` and uploads the unsigned app archive as an artifact.
+- `build-app.yml` runs `./script/build_and_run.sh --package` and uploads the ad hoc signed, non-notarized app archive as an artifact.
 
 Both workflows run on `macos-15`.
 
