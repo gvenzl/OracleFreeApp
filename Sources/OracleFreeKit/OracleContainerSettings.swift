@@ -1,4 +1,4 @@
-public struct OracleContainerSettings: Equatable, Sendable {
+public struct OracleContainerSettings: Codable, Equatable, Sendable {
     public var image: String
     public var containerName: String
     public var hostPort: Int
@@ -28,6 +28,40 @@ public struct OracleContainerSettings: Equatable, Sendable {
         self.volumeName = volumeName
         self.password = password
         self.normalizedExtraEnvironmentVariables = Self.normalizedExtraEnvironmentVariables(extraEnvironmentVariables)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case image
+        case containerName
+        case hostPort
+        case volumeName
+        case password
+        case extraEnvironmentVariables
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            image: try container.decode(String.self, forKey: .image),
+            containerName: try container.decode(String.self, forKey: .containerName),
+            hostPort: try container.decode(Int.self, forKey: .hostPort),
+            volumeName: try container.decode(String.self, forKey: .volumeName),
+            password: try container.decode(String.self, forKey: .password),
+            extraEnvironmentVariables: try container.decode(
+                [ContainerEnvironmentVariable].self,
+                forKey: .extraEnvironmentVariables
+            )
+        )
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(image, forKey: .image)
+        try container.encode(containerName, forKey: .containerName)
+        try container.encode(hostPort, forKey: .hostPort)
+        try container.encode(volumeName, forKey: .volumeName)
+        try container.encode(password, forKey: .password)
+        try container.encode(extraEnvironmentVariables, forKey: .extraEnvironmentVariables)
     }
 
     public static let `default` = OracleContainerSettings(

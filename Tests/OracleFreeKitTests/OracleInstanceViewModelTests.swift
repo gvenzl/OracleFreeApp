@@ -143,6 +143,17 @@ struct OracleInstanceViewModelTests {
         #expect(viewModel.status == .missing)
     }
 
+    @Test func oracleInstanceViewModelCanPreserveVolumeWhenDeletingInstance() async throws {
+        let service = RecordingOracleInstanceService()
+        let viewModel = Self.makeViewModel(service: service)
+
+        await viewModel.deleteInstance(preservesVolume: true)
+
+        #expect(await service.deleteRequests == [
+            DeleteRequest(configuration: .default, preservesVolume: true)
+        ])
+    }
+
     private static func makeViewModel(
         service: any OracleInstanceServicing,
         settings: OracleContainerSettings = .default,
@@ -265,8 +276,14 @@ private struct FailingCreateError: LocalizedError {
 }
 
 private actor RecordingOracleInstanceService: OracleInstanceServicing {
+    struct DeleteRequest: Equatable {
+        let configuration: OracleContainerConfiguration
+        let preservesVolume: Bool
+    }
+
     private(set) var createdConfigurations: [OracleContainerConfiguration] = []
     private(set) var deletedConfigurations: [OracleContainerConfiguration] = []
+    private(set) var deleteRequests: [DeleteRequest] = []
 
     func inspectInstance(configuration: OracleContainerConfiguration) async throws -> OracleInstanceStatus {
         .missing
@@ -283,10 +300,17 @@ private actor RecordingOracleInstanceService: OracleInstanceServicing {
         deletedConfigurations.append(configuration)
     }
 
+    func deleteInstance(configuration: OracleContainerConfiguration, preservesVolume: Bool) async throws {
+        deletedConfigurations.append(configuration)
+        deleteRequests.append(DeleteRequest(configuration: configuration, preservesVolume: preservesVolume))
+    }
+
     func containerLogs(configuration: OracleContainerConfiguration) async throws -> String {
         ""
     }
 }
+
+private typealias DeleteRequest = RecordingOracleInstanceService.DeleteRequest
 
 private actor SuspendedCreateOracleInstanceService: OracleInstanceServicing {
     private let statusAfterCreate: OracleInstanceStatus

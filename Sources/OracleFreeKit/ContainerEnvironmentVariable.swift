@@ -1,4 +1,4 @@
-public struct ContainerEnvironmentVariable: Equatable, Sendable {
+public struct ContainerEnvironmentVariable: Codable, Equatable, Sendable {
     public let name: String
     public let value: String
 

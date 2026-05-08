@@ -12,6 +12,7 @@ struct OracleFreeMacOSApp: App {
     @State private var showsConfigurationDialog = false
 
     private static let runtimeFactory = DefaultContainerRuntimeFactory()
+    private static let containerSettingsStore = OracleContainerSettingsStore()
 
     var body: some Scene {
         WindowGroup(OracleFreeAppMetadata.displayName, id: OracleFreeWindowID.main) {
@@ -24,12 +25,14 @@ struct OracleFreeMacOSApp: App {
                     showsConfigurationDialog = true
                 }
             )
+            .oracleFreeDynamicWindowSizing()
             .sheet(isPresented: $showsConfigurationDialog) {
                 OracleContainerConfigurationDialogView(
                     settings: Binding {
                         oracleInstanceViewModel.containerSettings
                     } set: { settings in
                         oracleInstanceViewModel.containerSettings = settings
+                        Self.saveContainerSettings(settings)
                     }
                 )
             }
@@ -51,6 +54,10 @@ struct OracleFreeMacOSApp: App {
                 }
             }
         }
+        .defaultSize(
+            width: OracleFreeWindowConfiguration.defaultWidth,
+            height: OracleFreeWindowConfiguration.defaultHeight
+        )
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About \(OracleFreeAppMetadata.displayName)") {
@@ -92,14 +99,17 @@ struct OracleFreeMacOSApp: App {
 
         switch runtimeAvailability {
         case let .oneRuntimeAvailable(runtime):
+            runtimeSelectionViewModel.updateAvailableRuntimes([runtime])
             configureRuntime(runtime)
             return runtime
-        case .multipleRuntimesAvailable:
+        case let .multipleRuntimesAvailable(availableRuntimes):
+            runtimeSelectionViewModel.updateAvailableRuntimes(availableRuntimes)
             if let selectedRuntime = runtimeSelectionViewModel.selectedRuntime {
                 configureRuntime(selectedRuntime)
                 return selectedRuntime
             }
         case .noSupportedRuntimeInstalled:
+            runtimeSelectionViewModel.updateAvailableRuntimes([])
             return nil
         }
 
@@ -108,8 +118,10 @@ struct OracleFreeMacOSApp: App {
 
     private func configureRuntime(_ runtime: ContainerRuntimeKind) {
         let containerRuntime = Self.runtimeFactory.makeRuntime(for: runtime)
+        let containerSettings = oracleInstanceViewModel.containerSettings
         oracleInstanceViewModel = OracleInstanceViewModel(
-            service: OracleInstanceService(runtime: containerRuntime)
+            service: OracleInstanceService(runtime: containerRuntime),
+            containerSettings: containerSettings
         )
         configureShutdownHandler()
 
@@ -144,8 +156,17 @@ struct OracleFreeMacOSApp: App {
         OracleInstanceViewModel(
             service: OracleInstanceService(
                 runtime: runtimeFactory.makeRuntime(for: runtime)
-            )
+            ),
+            containerSettings: loadContainerSettings()
         )
+    }
+
+    private static func loadContainerSettings() -> OracleContainerSettings {
+        (try? containerSettingsStore.loadSettings()) ?? .default
+    }
+
+    private static func saveContainerSettings(_ settings: OracleContainerSettings) {
+        try? containerSettingsStore.save(settings: settings)
     }
 
     private func configureShutdownHandler() {
@@ -175,9 +196,11 @@ final class OracleFreeApplicationDelegate: NSObject, NSApplicationDelegate {
     var shutdownHandler: (() async -> Void)?
 
     private var terminationIsInProgress = false
+    private var keyDownMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+        installTextEditingShortcutMonitor()
         removeUnsupportedTopLevelMenus()
     }
 
@@ -223,6 +246,27 @@ final class OracleFreeApplicationDelegate: NSObject, NSApplicationDelegate {
     private func removeUnsupportedTopLevelMenus() {
         DispatchQueue.main.async {
             self.removeMenus(titled: ["File", "Edit", "Format"])
+        }
+    }
+
+    private func installTextEditingShortcutMonitor() {
+        guard keyDownMonitor == nil else {
+            return
+        }
+
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard let action = TextEditingKeyboardCommand.action(
+                charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+                modifierFlags: event.modifierFlags
+            ) else {
+                return event
+            }
+
+            if NSApp.sendAction(action.selector, to: nil, from: nil) {
+                return nil
+            }
+
+            return event
         }
     }
 }

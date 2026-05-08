@@ -6,7 +6,14 @@ public protocol OracleInstanceServicing: Sendable {
     func startInstance(configuration: OracleContainerConfiguration) async throws
     func stopInstance(configuration: OracleContainerConfiguration) async throws
     func deleteInstance(configuration: OracleContainerConfiguration) async throws
+    func deleteInstance(configuration: OracleContainerConfiguration, preservesVolume: Bool) async throws
     func containerLogs(configuration: OracleContainerConfiguration) async throws -> String
+}
+
+public extension OracleInstanceServicing {
+    func deleteInstance(configuration: OracleContainerConfiguration, preservesVolume: Bool) async throws {
+        try await deleteInstance(configuration: configuration)
+    }
 }
 
 public struct OracleInstanceService: OracleInstanceServicing {
@@ -71,10 +78,14 @@ public struct OracleInstanceService: OracleInstanceServicing {
     }
 
     public func deleteInstance(configuration: OracleContainerConfiguration) async throws {
+        try await deleteInstance(configuration: configuration, preservesVolume: false)
+    }
+
+    public func deleteInstance(configuration: OracleContainerConfiguration, preservesVolume: Bool) async throws {
         try await runtime.deleteContainer(named: configuration.containerName)
 
         let volumeName = configuration.volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !volumeName.isEmpty {
+        if !preservesVolume, !volumeName.isEmpty {
             try await runtime.deleteVolume(named: volumeName)
         }
     }

@@ -30,4 +30,27 @@ struct RuntimeSelectionViewModelTests {
         #expect(viewModel.selectedRuntime == nil)
         #expect(viewModel.selection == nil)
     }
+
+    @Test func runtimeSelectionViewModelUpdatesAvailableRuntimes() {
+        let viewModel = RuntimeSelectionViewModel(
+            availableRuntimes: [.docker, .podman, .rancherDesktop]
+        )
+
+        viewModel.updateAvailableRuntimes([.docker, .podman])
+
+        #expect(viewModel.availableRuntimes == [.docker, .podman])
+    }
+
+    @Test func runtimeSelectionViewModelClearsSelectionWhenUpdatedRuntimesDoNotContainIt() {
+        let viewModel = RuntimeSelectionViewModel(
+            availableRuntimes: [.docker, .podman, .rancherDesktop],
+            selectedRuntime: .rancherDesktop
+        )
+
+        viewModel.updateAvailableRuntimes([.docker, .podman])
+
+        #expect(viewModel.availableRuntimes == [.docker, .podman])
+        #expect(viewModel.selectedRuntime == nil)
+        #expect(viewModel.selection == nil)
+    }
 }

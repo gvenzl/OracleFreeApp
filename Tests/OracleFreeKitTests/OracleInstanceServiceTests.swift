@@ -179,6 +179,18 @@ struct OracleInstanceServiceTests {
         #expect(recordedVolumeDeletes == [OracleContainerConfiguration.default.volumeName])
     }
 
+    @Test func servicePreservesVolumeWhenDeletingContainer() async throws {
+        let runtime = FakeContainerRuntime(containers: [])
+        let service = OracleInstanceService(runtime: runtime, configuration: .default)
+
+        try await service.deleteInstance(configuration: .default, preservesVolume: true)
+
+        let recordedDeletes = await runtime.deletedContainerNames
+        let recordedVolumeDeletes = await runtime.deletedVolumeNames
+        #expect(recordedDeletes == [OracleContainerConfiguration.default.containerName])
+        #expect(recordedVolumeDeletes == [])
+    }
+
     @Test func serviceSkipsVolumeDeleteWhenVolumeNameIsEmpty() async throws {
         let configuration = OracleContainerConfiguration(
             containerName: "oracle-dev",

@@ -13,6 +13,10 @@ public struct OracleConnectionInfo: Equatable, Sendable {
         self.password = password
     }
 
+    public var connectionString: String {
+        "\(username)/\(password)@\(host):\(port)/\(serviceName)"
+    }
+
     public static let `default` = OracleConnectionInfo(
         host: "localhost",
         port: 1521,

@@ -85,10 +85,17 @@ public final class OracleInstanceViewModel {
     }
 
     public func deleteInstance() async {
+        await deleteInstance(preservesVolume: false)
+    }
+
+    public func deleteInstance(preservesVolume: Bool) async {
         let configuration = activeConfiguration
         await refreshStatus(
             after: {
-                try await self.service.deleteInstance(configuration: configuration)
+                try await self.service.deleteInstance(
+                    configuration: configuration,
+                    preservesVolume: preservesVolume
+                )
             },
             configuration: configuration
         )

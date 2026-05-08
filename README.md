@@ -48,7 +48,9 @@ The default settings are:
 
 Open **Configuration** from the main view or menu bar item to change the image, container name, host port, volume name, password, and extra environment variables before creating the container.
 
-If the volume name is empty, the app does not pass a `--volume` option to the runtime. When deleting Oracle Database Free, the app removes the container and the configured volume if a volume name is set.
+Configuration changes are persisted in a JSON file under the user's Application Support folder and are reloaded on the next app start.
+
+If the volume name is empty, the app does not pass a `--volume` option to the runtime. When deleting Oracle Database Free and a volume is configured, the delete dialog lets you choose whether to preserve that volume or delete it alongside the container.
 
 ## Connection Details
 

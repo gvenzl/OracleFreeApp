@@ -173,16 +173,23 @@ struct RootViewTests {
 
         #expect(output.contains("Oracle Database Free is ready"))
         #expect(output.contains("Connection Details"))
+        #expect(output.contains("GroupBox"))
         #expect(output.contains("FREEPDB1"))
-        #expect(output.contains("Username: system"))
-        #expect(output.contains("Password: OracleFree123"))
-        #expect(output.contains("Connection String: system/OracleFree123@localhost:1521/FREEPDB1"))
+        #expect(output.contains("Username"))
+        #expect(output.contains("system"))
+        #expect(output.contains("Password"))
+        #expect(output.contains("OracleFree123"))
+        #expect(output.contains("Connect String"))
+        #expect(output.contains("system/OracleFree123@localhost:1521/FREEPDB1"))
+        #expect(output.contains("Copy"))
         #expect(output.contains("Container"))
         #expect(output.contains("OracleFreeAppIcon"))
         #expect(output.contains("Running"))
         #expect(output.contains("oracle-free"))
         #expect(output.contains("1521:1521"))
         #expect(output.contains("oracle-free-data"))
+        #expect(output.contains("Con State: running"))
+        #expect(output.contains("Con status: healthy"))
         #expect(output.contains("running"))
     }
 
@@ -210,10 +217,42 @@ struct RootViewTests {
         #expect(output.contains("Container"))
         #expect(output.contains("OracleFreeAppIcon"))
         #expect(output.contains("Stopped"))
+        #expect(output.contains("Oracle Database Free is stopped"))
         #expect(output.contains("oracle-free"))
+        #expect(output.contains("Con State: exited"))
+        #expect(output.contains("Con status: Exited (0)"))
         #expect(output.contains("Start Oracle Database Free"))
         #expect(output.contains("Delete Oracle Database Free"))
-        #expect(output.contains("This removes the container and configured volume."))
+        #expect(output.contains("DeleteOracleInstanceDialogView"))
+    }
+
+    @Test func deleteDialogOffersVolumePreservationWhenVolumeIsDefined() {
+        let view = DeleteOracleInstanceDialogView(
+            volumeName: "oracle-free-data",
+            preservesVolume: .constant(false),
+            onCancel: {},
+            onDelete: { _ in }
+        )
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Delete Oracle Database Free?"))
+        #expect(output.contains("Preserve volume oracle-free-data"))
+        #expect(output.contains("Delete Oracle Database Free"))
+    }
+
+    @Test func deleteDialogOmitsVolumePreservationWhenVolumeIsEmpty() {
+        let view = DeleteOracleInstanceDialogView(
+            volumeName: "",
+            preservesVolume: .constant(false),
+            onCancel: {},
+            onDelete: { _ in }
+        )
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Delete Oracle Database Free?"))
+        #expect(!output.contains("Preserve volume"))
     }
 
     @Test func oracleInstanceViewRendersRunningStateWithContainerDetails() {

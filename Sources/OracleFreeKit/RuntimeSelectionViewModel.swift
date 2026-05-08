@@ -3,7 +3,7 @@ import Observation
 @MainActor
 @Observable
 public final class RuntimeSelectionViewModel {
-    public let availableRuntimes: [ContainerRuntimeKind]
+    public private(set) var availableRuntimes: [ContainerRuntimeKind]
     public private(set) var selectedRuntime: ContainerRuntimeKind?
 
     public var selection: ContainerRuntimeSelection? {
@@ -32,5 +32,13 @@ public final class RuntimeSelectionViewModel {
 
     public func clearSelection() {
         selectedRuntime = nil
+    }
+
+    public func updateAvailableRuntimes(_ availableRuntimes: [ContainerRuntimeKind]) {
+        self.availableRuntimes = availableRuntimes
+
+        if let selectedRuntime, !availableRuntimes.contains(selectedRuntime) {
+            self.selectedRuntime = nil
+        }
     }
 }

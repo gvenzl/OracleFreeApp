@@ -77,6 +77,10 @@ struct ContainerRuntimeCommandFailure: LocalizedError, Equatable, Sendable {
             return "Unable to find \(runtimeName)'s command line tool. Install \(runtimeName) or choose another container runtime."
         }
 
+        if isRuntimeConnectionFailure {
+            return "Unable to connect to \(runtimeName). Make sure \(runtimeName) is running, then try again."
+        }
+
         if operation == .createContainer, isPortConflict {
             return "Port conflict while creating Oracle Database Free. Another process or container is already using the configured host port. Change the host port in Configuration or stop the process using it."
         }
@@ -101,6 +105,15 @@ struct ContainerRuntimeCommandFailure: LocalizedError, Equatable, Sendable {
         normalizedMessage.contains("no such file or directory")
             || normalizedMessage.contains("command not found")
             || normalizedMessage.contains("executable file not found")
+    }
+
+    private var isRuntimeConnectionFailure: Bool {
+        normalizedMessage.contains("cannot connect")
+            || normalizedMessage.contains("can't connect")
+            || normalizedMessage.contains("connection refused")
+            || normalizedMessage.contains("is the docker daemon running")
+            || normalizedMessage.contains("podman machine")
+            || normalizedMessage.contains("docker daemon is not running")
     }
 
     private var isPortConflict: Bool {

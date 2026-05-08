@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -9,11 +10,20 @@ public protocol OracleInstanceViewing: AnyObject {
     func startInstance() async
     func stopInstance() async
     func deleteInstance() async
+    func deleteInstance(preservesVolume: Bool) async
+}
+
+public extension OracleInstanceViewing {
+    func deleteInstance(preservesVolume: Bool) async {
+        await deleteInstance()
+    }
 }
 
 public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
     @State private var viewModel: ViewModel
     @State private var showsDeleteConfirmation = false
+    @State private var preservesVolumeOnDelete = false
+    @State private var deleteConfirmationVolumeName = ""
     private let openConfiguration: @MainActor () -> Void
 
     public init(
@@ -27,20 +37,27 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
     @ViewBuilder
     public var body: some View {
         statusContent
-            .confirmationDialog(
-                "Delete Oracle Database Free?",
-                isPresented: $showsDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete Oracle Database Free", role: .destructive) {
-                    Task {
-                        await viewModel.deleteInstance()
+            .sheet(isPresented: $showsDeleteConfirmation) {
+                DeleteOracleInstanceDialogView(
+                    volumeName: deleteConfirmationVolumeName,
+                    preservesVolume: $preservesVolumeOnDelete,
+                    onCancel: {
+                        showsDeleteConfirmation = false
+                    },
+                    onDelete: { preservesVolume in
+                        showsDeleteConfirmation = false
+                        Task {
+                            await viewModel.deleteInstance(preservesVolume: preservesVolume)
+                        }
                     }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes the container and configured volume.")
+                )
             }
+    }
+
+    private func showDeleteConfirmation(volumeName: String) {
+        deleteConfirmationVolumeName = volumeName
+        preservesVolumeOnDelete = false
+        showsDeleteConfirmation = true
     }
 
     @ViewBuilder
@@ -67,14 +84,17 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
             }
         case let .stopped(details):
             VStack(alignment: .leading, spacing: 12) {
-                Text("Oracle Database Free is stopped")
-                containerDetailsBox(details, trafficLight: .stopped)
+                containerDetailsBox(
+                    details,
+                    trafficLight: .stopped,
+                    stateMessage: viewModel.status.containerStateMessage
+                )
                 Button("Start Oracle Database Free") {
                     Task {
                         await viewModel.startInstance()
                     }
                 }
-                deleteButton()
+                deleteButton(volumeName: details.volumeName)
             }
         case let .running(details):
             VStack(alignment: .leading, spacing: 12) {
@@ -90,15 +110,18 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
             }
         case let .ready(details):
             VStack(alignment: .leading, spacing: 12) {
-                Text("Oracle Database Free is ready")
+                containerDetailsBox(
+                    details,
+                    trafficLight: .running,
+                    stateMessage: viewModel.status.containerStateMessage
+                )
                 connectionDetailsView(details.connectionInfo)
-                containerDetailsBox(details, trafficLight: .running)
                 Button("Stop Oracle Database Free") {
                     Task {
                         await viewModel.stopInstance()
                     }
                 }
-                deleteButton()
+                deleteButton(volumeName: details.volumeName)
             }
         case let .failed(message):
             VStack(alignment: .leading, spacing: 12) {
@@ -109,32 +132,74 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
         }
     }
 
-    private func deleteButton() -> some View {
+    private func deleteButton(volumeName: String) -> some View {
         Button("Delete Oracle Database Free", role: .destructive) {
-            showsDeleteConfirmation = true
+            showDeleteConfirmation(volumeName: volumeName)
         }
     }
 
     private func connectionDetailsView(_ connectionInfo: OracleConnectionInfo) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Connection Details")
-            Text("Service: \(connectionInfo.serviceName)")
-            Text("Host: \(connectionInfo.host)")
-            Text("Port: \(String(connectionInfo.port))")
-            Text("Username: \(connectionInfo.username)")
-            Text("Password: \(connectionInfo.password)")
-            Text("Connection String: \(connectionString(for: connectionInfo))")
+        let connectionString = connectionInfo.connectionString
+
+        return GroupBox("Connection Details") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        connectionDetailRow(title: "Host", value: connectionInfo.host)
+                        connectionDetailRow(title: "Port", value: String(connectionInfo.port))
+                        connectionDetailRow(title: "Service", value: connectionInfo.serviceName)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        connectionDetailRow(title: "Username", value: connectionInfo.username)
+                        connectionDetailRow(title: "Password", value: connectionInfo.password)
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Connect String")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(connectionString)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button {
+                            copyConnectionString(connectionString)
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .textSelection(.enabled)
     }
 
-    private func connectionString(for connectionInfo: OracleConnectionInfo) -> String {
-        "\(connectionInfo.username)/\(connectionInfo.password)@\(connectionInfo.host):\(connectionInfo.port)/\(connectionInfo.serviceName)"
+    private func connectionDetailRow(title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .frame(width: 78, alignment: .leading)
+            Text(value)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func copyConnectionString(_ connectionString: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(connectionString, forType: .string)
     }
 
     private func containerDetailsBox(
         _ details: OracleContainerDetails,
-        trafficLight: OracleContainerTrafficLight
+        trafficLight: OracleContainerTrafficLight,
+        stateMessage: String? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
@@ -146,14 +211,23 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
                 }
             }
             HStack(spacing: 6) {
-                Circle()
-                    .fill(trafficLight.color)
-                    .frame(width: 10, height: 10)
-                    .overlay(
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
                         Circle()
-                            .stroke(.primary.opacity(0.25), lineWidth: 0.5)
-                    )
-                Text(trafficLight.title)
+                            .fill(trafficLight.color)
+                            .frame(width: 10, height: 10)
+                            .overlay(
+                                Circle()
+                                    .stroke(.primary.opacity(0.25), lineWidth: 0.5)
+                            )
+                        Text(trafficLight.title)
+                    }
+                    if let stateMessage {
+                        Text(stateMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Container state: \(trafficLight.title)")
@@ -161,8 +235,8 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
             Text("Image: \(details.image)")
             Text("Port: \(String(details.hostPort)):\(String(details.databasePort))")
             Text("Volume: \(displayVolumeName(for: details.volumeName))")
-            Text("State: \(details.state)")
-            Text("Status: \(details.status)")
+            Text("Con State: \(details.state)")
+            Text("Con status: \(details.status)")
         }
         .padding(12)
         .background(.background)
@@ -196,6 +270,56 @@ public struct OracleInstanceView<ViewModel: OracleInstanceViewing>: View {
 }
 
 extension OracleInstanceViewModel: OracleInstanceViewing {}
+
+struct DeleteOracleInstanceDialogView: View {
+    let volumeName: String
+    @Binding var preservesVolume: Bool
+    let onCancel: @MainActor () -> Void
+    let onDelete: @MainActor (Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Delete Oracle Database Free?")
+                .font(.headline)
+
+            Text(deleteMessage)
+                .foregroundStyle(.secondary)
+
+            if hasConfiguredVolume {
+                Toggle("Preserve volume \(trimmedVolumeName)", isOn: $preservesVolume)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    onCancel()
+                }
+                Button("Delete Oracle Database Free", role: .destructive) {
+                    onDelete(preservesVolume)
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding()
+        .frame(width: 420)
+    }
+
+    private var deleteMessage: String {
+        if hasConfiguredVolume {
+            return "This removes the container. Leave Preserve volume unchecked to delete the configured volume alongside it."
+        }
+
+        return "This removes the container. No volume is configured."
+    }
+
+    private var hasConfiguredVolume: Bool {
+        !trimmedVolumeName.isEmpty
+    }
+
+    private var trimmedVolumeName: String {
+        volumeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
 
 struct OracleContainerTrafficLightRGB: Equatable {
     let red: Double
