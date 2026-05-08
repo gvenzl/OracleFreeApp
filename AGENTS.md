@@ -108,6 +108,15 @@ cd /Users/gvenzl/git/OracleFreeApp
 `--package` creates an unsigned archive named `dist/Oracle Free App-1.0.0-unsigned.zip`.
 It is useful for local bundle validation, but it is not signed, notarized, or ready for Gatekeeper distribution.
 
+### GitHub Actions
+
+CI workflows now live in `.github/workflows/`.
+
+- `tests.yml` runs `swift build` and `swift test` on `macos-15`.
+- `build-app.yml` runs `./script/build_and_run.sh --package` on `macos-15` and uploads the unsigned app archive as a workflow artifact.
+
+Do not use `./script/build_and_run.sh --verify` in GitHub Actions unless the workflow is intentionally validating GUI launch behavior. The package mode builds the app bundle without launching the app, which is better suited to hosted CI.
+
 ### Git commits
 
 When creating commits in this repository, always include signoff:
@@ -281,7 +290,6 @@ No evidence was found for these repo-local tools or instruction files:
 - `CLAUDE.md`
 - `swiftlint` config
 - `swiftformat` config
-- CI workflows
 - `Makefile`
 
 Do not reference, rely on, or claim support for nonexistent tooling.

@@ -1,0 +1,38 @@
+name: Build App
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-app:
+    name: Package Unsigned App
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build unsigned app archive
+        run: ./script/build_and_run.sh --package
+
+      - name: Verify app archive exists
+        run: test -f "dist/Oracle Free App-1.0.0-unsigned.zip"
+
+      - name: Upload app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: oracle-free-app-unsigned
+          path: dist/Oracle Free App-1.0.0-unsigned.zip
+          if-no-files-found: error

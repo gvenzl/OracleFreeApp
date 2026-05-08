@@ -110,6 +110,15 @@ swift test --filter 'OracleFreeKitTests.RootViewTests'
 
 This project uses Swift Testing, not XCTest.
 
+## Continuous Integration
+
+GitHub Actions workflows are defined under `.github/workflows/`:
+
+- `tests.yml` runs `swift build` and `swift test`.
+- `build-app.yml` runs `./script/build_and_run.sh --package` and uploads the unsigned app archive as an artifact.
+
+Both workflows run on `macos-15`.
+
 ## Troubleshooting
 
 **No supported container runtime found**
