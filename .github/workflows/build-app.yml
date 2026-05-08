@@ -28,11 +28,11 @@ jobs:
         run: ./script/build_and_run.sh --package
 
       - name: Verify app archive exists
-        run: test -f "dist/Oracle Free App-1.0.0-unsigned.zip"
+        run: test -f "dist/Oracle Free App-1.0.0.dmg"
 
       - name: Upload app archive
         uses: actions/upload-artifact@v4
         with:
-          name: oracle-free-app-unsigned
-          path: dist/Oracle Free App-1.0.0-unsigned.zip
+          name: oracle-free-app-dmg
+          path: dist/Oracle Free App-1.0.0.dmg
           if-no-files-found: error

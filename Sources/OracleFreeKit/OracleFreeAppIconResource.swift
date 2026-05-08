@@ -3,7 +3,8 @@ import Foundation
 
 public enum OracleFreeAppIconResource {
     public static var image: NSImage? {
-        guard let url = Bundle.module.url(forResource: "OracleFreeAppIcon", withExtension: "png") else {
+        guard let url = Bundle.main.url(forResource: "OracleFreeAppIcon", withExtension: "png") ??
+            Bundle.module.url(forResource: "OracleFreeAppIcon", withExtension: "png") else {
             return nil
         }
 

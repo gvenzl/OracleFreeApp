@@ -17,20 +17,25 @@ APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/OracleFreeKit/Resources/OracleFreeAppIcon.icns"
-PACKAGE_ARCHIVE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION-unsigned.zip"
+APP_ICON_PNG_SOURCE="$ROOT_DIR/Sources/OracleFreeKit/Resources/OracleFreeAppIcon.png"
+DMG_STAGING_DIR="$DIST_DIR/dmg-root"
+PACKAGE_IMAGE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION.dmg"
+LEGACY_PACKAGE_ARCHIVE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION-unsigned.zip"
 
 cd "$ROOT_DIR"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
 swift build
-BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
+BUILD_DIR="$(swift build --show-bin-path)"
+BUILD_BINARY="$BUILD_DIR/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 cp "$APP_ICON_SOURCE" "$APP_RESOURCES/OracleFreeAppIcon.icns"
+cp "$APP_ICON_PNG_SOURCE" "$APP_RESOURCES/OracleFreeAppIcon.png"
 
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -70,12 +75,19 @@ open_app() {
 }
 
 package_app() {
-  rm -f "$PACKAGE_ARCHIVE"
-  (
-    cd "$DIST_DIR"
-    /usr/bin/ditto -c -k --norsrc --keepParent "$APP_DISPLAY_NAME.app" "$PACKAGE_ARCHIVE"
-  )
-  echo "$PACKAGE_ARCHIVE"
+  rm -f "$PACKAGE_IMAGE"
+  rm -f "$LEGACY_PACKAGE_ARCHIVE"
+  rm -rf "$DMG_STAGING_DIR"
+  mkdir -p "$DMG_STAGING_DIR"
+  /usr/bin/ditto "$APP_BUNDLE" "$DMG_STAGING_DIR/$APP_DISPLAY_NAME.app"
+  /usr/bin/hdiutil create \
+    -volname "$APP_DISPLAY_NAME" \
+    -srcfolder "$DMG_STAGING_DIR" \
+    -ov \
+    -format UDZO \
+    "$PACKAGE_IMAGE"
+  rm -rf "$DMG_STAGING_DIR"
+  echo "$PACKAGE_IMAGE"
 }
 
 case "$MODE" in
