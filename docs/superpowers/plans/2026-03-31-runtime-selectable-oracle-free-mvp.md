@@ -1,5 +1,11 @@
 # Runtime-Selectable Oracle Database Free MVP Implementation Plan
 
+> **Status note:** This is a historical implementation plan. The current app has moved beyond
+> this plan: it supports Docker, Podman, and Rancher Desktop runtime selection; Podman machine
+> readiness; Oracle container create/start/stop/delete; persisted container configuration; app
+> icon/menu bar integration; unsigned packaging; and resolved runtime executable paths for
+> packaged app launches. Use `README.md` and `AGENTS.md` for current repository guidance.
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the current Podman-machine-discovery macOS app into a runtime-selectable Oracle Database Free manager that can detect supported runtimes, inform the user when none are installed, let the user choose a runtime, and manage one Oracle Database Free container through the first concrete backend implementation.
@@ -508,4 +514,3 @@ If execution needs to pause between review points, pause after:
 2. backend-aware runtime abstraction + Podman container operations
 3. Oracle service + Oracle lifecycle view model
 4. end-to-end UI integration and full verification
-

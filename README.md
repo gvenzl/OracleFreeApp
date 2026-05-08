@@ -15,6 +15,8 @@ The repository name and Swift package name remain `OracleFreeApp`.
 
 Podman machine management is only used for Podman. Docker and Rancher Desktop go directly to the Oracle Database Free lifecycle view.
 
+The app resolves runtime commands by checking common macOS install locations before falling back to the launch environment's `PATH`. This keeps packaged/Finder launches from depending solely on a terminal shell configuration.
+
 ## Running Locally
 
 Use the project script from the repository root:
@@ -72,6 +74,8 @@ The password is shown in clear text because it is local container configuration 
 
 On launch, the app detects installed runtimes. If multiple runtimes are available, it asks you to choose Docker, Podman, or Rancher Desktop. After a runtime is selected, the main window shows the active runtime and offers a **Change Runtime** button when more than one runtime is available.
 
+Runtime detection records the resolved executable paths and reuses those paths for later container commands. Current lookup locations include Docker.app, Rancher Desktop.app, `~/.rd/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, and standard system binary directories.
+
 For Podman, the app loads available Podman machines. A single running default machine is selected automatically. Otherwise, the app shows the machine list or a start button for a stopped machine.
 
 The app checks the container health status and only marks Oracle Database Free as ready once the runtime reports a healthy container. While the container is starting or after failures, the app can show recent container logs.
@@ -110,11 +114,15 @@ This project uses Swift Testing, not XCTest.
 
 **No supported container runtime found**
 
-Install Docker, Podman, or Rancher Desktop and make sure the required CLI command is on `PATH`.
+Install Docker, Podman, or Rancher Desktop. The app checks common macOS install locations and then falls back to `PATH`; if you installed a runtime somewhere custom, add its CLI to `PATH` or symlink it into a common location such as `/opt/homebrew/bin` or `/usr/local/bin`.
 
 **Rancher Desktop is not offered**
 
-The app currently requires both `rdctl` and `nerdctl` to be available. Rancher Desktop must be installed and configured so its command line tools are reachable from the app environment.
+The app currently requires both `rdctl` and `nerdctl` to be available. Rancher Desktop must be installed and configured so its command line tools are available in Rancher Desktop.app, `~/.rd/bin`, or another location the app can resolve.
+
+**Configuration warning on startup or save**
+
+The app stores container configuration as JSON in the user's Application Support folder. If that file is corrupt or cannot be written, the app shows a configuration warning, uses defaults when loading fails, and keeps the current in-memory values when saving fails.
 
 **Podman machine cannot be started**
 

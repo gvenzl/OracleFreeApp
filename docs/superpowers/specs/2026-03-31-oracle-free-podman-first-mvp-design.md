@@ -1,5 +1,11 @@
 # Oracle Database Free macOS App — Runtime-Selectable MVP Design
 
+> **Status note:** This is a historical MVP design document. The current app is no longer just
+> a Podman-first discovery app; it has Docker, Podman, and Rancher Desktop runtime selection,
+> Oracle container lifecycle management, persisted container settings, readiness/log handling,
+> menu bar actions, unsigned packaging, and resolved executable path handling for packaged app
+> launches. Use `README.md` and `AGENTS.md` for current implementation guidance.
+
 **Date:** 2026-03-31  
 **Repository:** `/Users/gvenzl/git/OracleFreeApp`  
 **Working codebase:** `/Users/gvenzl/git/OracleFreeApp`

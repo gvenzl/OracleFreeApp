@@ -36,7 +36,8 @@ Verified from `Package.swift`:
 Executable entry point:
 - `Sources/OracleFreeApp/OracleFreeMacOSApp.swift`
 
-That file wires `AppViewModel`, `MachineSelectionViewModel`, and `RootView`.
+That file wires `AppViewModel`, `RuntimeSelectionViewModel`, `MachineSelectionViewModel`,
+`OracleContainerSettingsViewModel`, and `RootView`.
 Prefer putting reusable and test-covered behavior into `OracleFreeKit`, not the executable target, unless the code is truly bootstrap-specific.
 
 ## Verified Commands
@@ -94,6 +95,27 @@ swift package reset
 
 Use cleanup only when build artifacts or dependency state are the problem.
 
+### App bundle verification and packaging
+
+The local app workflow is script-based and creates a bundle under `dist/`.
+
+```bash
+cd /Users/gvenzl/git/OracleFreeApp
+./script/build_and_run.sh --verify
+./script/build_and_run.sh --package
+```
+
+`--package` creates an unsigned archive named `dist/Oracle Free App-1.0.0-unsigned.zip`.
+It is useful for local bundle validation, but it is not signed, notarized, or ready for Gatekeeper distribution.
+
+### Git commits
+
+When creating commits in this repository, always include signoff:
+
+```bash
+git commit --signoff -m "Commit message"
+```
+
 ## Testing Conventions
 
 This repository uses **Swift Testing**, not XCTest, in the current test suite.
@@ -130,10 +152,60 @@ Prefer value semantics for plain data and runtime adapters unless shared mutable
 
 The codebase already uses explicit dependency injection.
 Observed pattern:
-- `AppViewModel` depends on `any PodmanRuntime`
-- Tests inject fake runtime implementations
+- `AppViewModel` depends on `any ContainerRuntimeDetector`
+- `OracleInstanceService` depends on `any ContainerRuntime`
+- `MachineSelectionViewModel` depends on `any PodmanRuntime`
+- tests inject fake runtime, detector, service, and command-runner implementations
 
 Preserve this pattern rather than hard-wiring process execution or global state into view models.
+
+### Runtime command resolution
+
+Runtime detection is not just a Boolean "is installed" check. `DefaultContainerRuntimeDetector`
+returns `ContainerRuntimeInstallationStatus` values that carry `ContainerRuntimeExecutablePaths`.
+`DefaultContainerRuntimeFactory` must receive those paths and construct concrete runtimes with
+absolute command paths when available.
+
+This matters for packaged/Finder-launched app behavior, where the shell `PATH` is often much
+smaller than an interactive terminal's `PATH`.
+
+Current supported runtime command expectations:
+- Docker uses `docker`
+- Podman uses `podman`
+- Rancher Desktop requires `rdctl` for detection and uses `nerdctl` for container commands
+
+Current lookup behavior checks common macOS locations first, then falls back to `/usr/bin/which`:
+- `/Applications/Docker.app/Contents/Resources/bin/docker`
+- `/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/rdctl`
+- `/Applications/Rancher Desktop.app/Contents/Resources/resources/darwin/bin/nerdctl`
+- `$HOME/.rd/bin/rdctl`
+- `$HOME/.rd/bin/nerdctl`
+- `/opt/homebrew/bin`
+- `/usr/local/bin`
+- system binary directories
+
+Do not regress the runtime factory back to bare command names only.
+
+### Container settings
+
+Container settings are modeled in `OracleContainerSettings`, persisted by
+`OracleContainerSettingsStore`, and surfaced through `OracleContainerSettingsViewModel`.
+
+The settings view model intentionally reports load/save failures through `warningMessage` while
+falling back to defaults or keeping the in-memory values. Do not reintroduce silent `try?`
+load/save behavior in the app bootstrap.
+
+Default settings are:
+- image: `ghcr.io/gvenzl/oracle-free`
+- container name: `oracle-free`
+- host port: `1521`
+- container port: `1521`
+- volume: `oracle-free-data`
+- password: `OracleFree123`
+- environment: `ORACLE_PASSWORD=OracleFree123`
+
+An empty volume name is meaningful. It means the runtime `run` command must omit the `--volume`
+argument.
 
 ## Error Handling Conventions
 
@@ -145,6 +217,7 @@ Observed patterns:
 - UI state stores user-facing failures in `RuntimeStatus.failed(message:)`
 
 When adding new failure paths, preserve the existing error-to-message flow instead of inventing a parallel error presentation mechanism.
+For settings persistence, preserve the warning-message flow in `OracleContainerSettingsViewModel`.
 
 ## Formatting and Style
 
@@ -186,6 +259,13 @@ When deciding where code belongs:
 - Keep `OracleFreeApp` focused on app startup and composition.
 - Avoid moving logic into the executable target if it can live in the library target and be tested there.
 
+Current root flow:
+- runtime detection via `AppViewModel`
+- runtime selection via `RuntimeSelectionViewModel` when more than one runtime is found
+- Podman machine readiness via `MachineSelectionViewModel` only for Podman
+- Oracle container lifecycle via `OracleInstanceViewModel` and `OracleInstanceService`
+- persisted container configuration via `OracleContainerSettingsViewModel`
+
 ## Platform Assumptions
 
 `Package.swift` declares macOS 14.
@@ -214,6 +294,7 @@ Before changing code:
 3. Preserve the existing target split
 4. Follow Swift Testing patterns already in use
 5. Verify with `swift build` and `swift test`
+6. For bundle or app-launch-sensitive changes, also run `./script/build_and_run.sh --verify`
 
 Before running a single test:
 1. Run `swift test list`
@@ -227,9 +308,12 @@ Before running a single test:
 - Adding references to SwiftLint, SwiftFormat, Makefile targets, CI jobs, Cursor rules, or Copilot instructions that do not exist here
 - Placing reusable logic in the app bootstrap target when it belongs in `OracleFreeKit`
 - Replacing the current user-visible error mapping with inconsistent error handling paths
+- Dropping resolved executable paths from runtime detection before constructing concrete runtimes
+- Treating an empty volume name as a request to create/use a default volume
+- Silently ignoring persisted settings load/save failures
 
 ## Metadata
 
 - Generated for repository: `/Users/gvenzl/git/OracleFreeApp`
 - Branch: `main`
-- Commit: `54a5d8d`
+- Commit: `92950c7`
