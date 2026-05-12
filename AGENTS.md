@@ -115,7 +115,7 @@ not Developer ID signed, notarized, or ready for Gatekeeper distribution.
 CI workflows now live in `.github/workflows/`.
 
 - `tests.yml` runs `swift build` and `swift test` on `macos-15`.
-- `build-app.yml` runs `./script/build_and_run.sh --package` on `macos-15` and uploads the ad hoc signed, non-notarized app archive as a workflow artifact.
+- `build-app.yml` is on-demand only, runs `./script/build_and_run.sh --package` on `macos-15`, and uploads the ad hoc signed, non-notarized app archive as a workflow artifact. When manually dispatching the workflow, enable `publish_release` and provide `release_tag` to publish the DMG directly as a GitHub Release.
 
 Do not use `./script/build_and_run.sh --verify` in GitHub Actions unless the workflow is intentionally validating GUI launch behavior. The package mode builds the app bundle without launching the app, which is better suited to hosted CI.
 

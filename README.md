@@ -113,7 +113,7 @@ This project uses Swift Testing, not XCTest.
 GitHub Actions workflows are defined under `.github/workflows/`:
 
 - `tests.yml` runs `swift build` and `swift test`.
-- `build-app.yml` runs `./script/build_and_run.sh --package` and uploads the ad hoc signed, non-notarized app archive as an artifact.
+- `build-app.yml` is on-demand only, runs `./script/build_and_run.sh --package`, and uploads the ad hoc signed, non-notarized app archive as an artifact. When manually dispatching the workflow, enable `publish_release` and provide `release_tag` to publish the DMG directly as a GitHub Release.
 
 Both workflows run on `macos-15`.
 
