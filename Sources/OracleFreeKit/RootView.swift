@@ -85,7 +85,7 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
             Text("Runtime: \(runtime.displayName)")
             Spacer()
             if canChangeRuntime {
-                Button("Change Runtime") {
+                Button("Change") {
                     runtimeSelectionViewModel.clearSelection()
                 }
             }
@@ -95,11 +95,14 @@ public struct RootView<OracleViewModel: OracleInstanceViewing>: View {
     @ViewBuilder
     private func podmanRuntimeView() -> some View {
         switch selectionViewModel.status {
-        case .selected:
+        case let .selected(machine):
             OracleInstanceView(
                 viewModel: oracleInstanceViewModel,
                 openConfiguration: openConfiguration
             )
+            .task(id: machine.id) {
+                await selectionViewModel.monitorSelectedMachineStatus()
+            }
         default:
             PodmanMachineReadinessView(viewModel: selectionViewModel)
         }

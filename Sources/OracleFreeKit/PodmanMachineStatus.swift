@@ -3,6 +3,7 @@ public enum PodmanMachineStatus: Equatable, Sendable {
     case noMachinesFound
     case selectionRequired([PodmanMachine])
     case stopped(PodmanMachine)
+    case starting(PodmanMachine)
     case selected(PodmanMachine)
     case failed(message: String)
 }

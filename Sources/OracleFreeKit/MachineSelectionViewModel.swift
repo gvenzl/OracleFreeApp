@@ -73,6 +73,12 @@ public final class MachineSelectionViewModel {
             return
         }
 
+        guard case .stopped = status else {
+            return
+        }
+
+        status = .starting(selectedMachine)
+
         do {
             try await runtime.startMachine(named: selectedMachine.name)
             let runningMachine = PodmanMachine(
@@ -86,6 +92,44 @@ public final class MachineSelectionViewModel {
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             status = .failed(message: message)
+        }
+    }
+
+    public func refreshSelectedMachineStatus() async {
+        guard let runtime, let selectedMachine else {
+            return
+        }
+
+        guard case .selected = status else {
+            return
+        }
+
+        do {
+            let machines = try await runtime.discoverMachines()
+            guard let refreshedMachine = machines.first(where: { machine in
+                machine.id == selectedMachine.id || machine.name == selectedMachine.name
+            }) else {
+                updateStatus(for: machines)
+                return
+            }
+
+            self.selectedMachine = refreshedMachine
+            status = refreshedMachine.isRunning ? .selected(refreshedMachine) : .stopped(refreshedMachine)
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            status = .failed(message: message)
+        }
+    }
+
+    public func monitorSelectedMachineStatus(intervalNanoseconds: UInt64 = 5_000_000_000) async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: intervalNanoseconds)
+            } catch {
+                return
+            }
+
+            await refreshSelectedMachineStatus()
         }
     }
 

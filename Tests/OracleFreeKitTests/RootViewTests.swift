@@ -98,7 +98,7 @@ struct RootViewTests {
         let output = String(describing: rootView.body)
 
         #expect(output.contains("Runtime: Docker"))
-        #expect(output.contains("Change Runtime"))
+        #expect(output.contains("Change"))
         #expect(output.contains("OracleInstanceView"))
     }
 
@@ -325,6 +325,32 @@ struct RootViewTests {
         #expect(output.contains("Podman machine is stopped"))
         #expect(output.contains("podman-machine-default"))
     }
+
+    @Test func podmanMachineReadinessViewRendersStartingMachineState() async {
+        let machine = PodmanMachine(
+            id: "machine-default",
+            name: "podman-machine-default",
+            isRunning: false,
+            isDefault: true,
+            connectionName: "podman-machine-default-root"
+        )
+        let runtime = BlockingMachineStartPreviewRuntime(machines: [machine])
+        let viewModel = MachineSelectionViewModel(runtime: runtime)
+        await viewModel.loadMachines()
+        let startTask = Task {
+            await viewModel.startSelectedMachine()
+        }
+        await runtime.waitForStartAttempt()
+        let view = PodmanMachineReadinessView(viewModel: viewModel)
+
+        let output = String(describing: view.body)
+
+        #expect(output.contains("Starting Podman machine"))
+        #expect(output.contains("Waiting for Podman machine to start"))
+
+        await runtime.resumeStart()
+        await startTask.value
+    }
 }
 
 private struct PreviewRuntimeDetector: ContainerRuntimeDetector {
@@ -394,6 +420,52 @@ private struct EmptyMachinePreviewRuntime: PodmanRuntime {
     }
 
     func startMachine(named name: String) async throws {}
+    func listContainers() async throws -> [ContainerSummary] { [] }
+    func createContainer(configuration: OracleContainerConfiguration) async throws {}
+    func startContainer(named name: String) async throws {}
+    func stopContainer(named name: String) async throws {}
+    func deleteContainer(named name: String) async throws {}
+    func deleteVolume(named name: String) async throws {}
+    func containerLogs(named name: String) async throws -> String { "" }
+}
+
+private actor BlockingMachineStartPreviewRuntime: PodmanRuntime {
+    let machines: [PodmanMachine]
+
+    private var pendingStartContinuation: CheckedContinuation<Void, Never>?
+    private var waitForStartContinuation: CheckedContinuation<Void, Never>?
+
+    init(machines: [PodmanMachine]) {
+        self.machines = machines
+    }
+
+    func discoverMachines() async throws -> [PodmanMachine] {
+        machines
+    }
+
+    func startMachine(named name: String) async throws {
+        waitForStartContinuation?.resume()
+        waitForStartContinuation = nil
+        await withCheckedContinuation { continuation in
+            pendingStartContinuation = continuation
+        }
+    }
+
+    func waitForStartAttempt() async {
+        guard pendingStartContinuation == nil else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waitForStartContinuation = continuation
+        }
+    }
+
+    func resumeStart() {
+        pendingStartContinuation?.resume()
+        pendingStartContinuation = nil
+    }
+
     func listContainers() async throws -> [ContainerSummary] { [] }
     func createContainer(configuration: OracleContainerConfiguration) async throws {}
     func startContainer(named name: String) async throws {}

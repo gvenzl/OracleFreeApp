@@ -32,6 +32,18 @@ public struct PodmanMachineReadinessView: View {
                     }
                 }
             }
+        case let .starting(machine):
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Starting Podman machine")
+                Text(machine.name)
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Waiting for Podman machine to start")
+                }
+                Button("Start Podman machine") {}
+                    .disabled(true)
+            }
         case .selected:
             EmptyView()
         case let .failed(message):
