@@ -35,7 +35,7 @@ Useful variants:
 ./script/build_and_run.sh --package
 ```
 
-The `--package` mode creates a disk image at `dist/Oracle Free App-1.0.0.dmg`. The assembled `.app` inside the DMG is ad hoc signed so its bundle resources validate correctly, but it is not Developer ID signed, notarized, or ready for Gatekeeper distribution.
+The `--package` mode creates a disk image at `dist/Oracle Free App-<version>.dmg`, where `<version>` comes from the repository root `VERSION` file. The assembled `.app` inside the DMG is ad hoc signed so its bundle resources validate correctly, but it is not Developer ID signed, notarized, or ready for Gatekeeper distribution.
 
 ## Default Container Configuration
 

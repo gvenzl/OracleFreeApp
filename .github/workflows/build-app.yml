@@ -44,25 +44,39 @@ jobs:
         run: ./script/build_and_run.sh --package
 
       - name: Verify app archive exists
-        run: test -f "dist/Oracle Free App-1.0.0.dmg"
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          app_archives=(dist/Oracle\ Free\ App-*.dmg)
+          if [ "${#app_archives[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one app archive, found ${#app_archives[@]}."
+            exit 1
+          fi
 
       - name: Upload app archive
         uses: actions/upload-artifact@v4
         with:
           name: oracle-free-app-dmg
-          path: dist/Oracle Free App-1.0.0.dmg
+          path: dist/Oracle Free App-*.dmg
           if-no-files-found: error
 
       - name: Publish GitHub release
         if: ${{ inputs.publish_release }}
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_ASSET: dist/Oracle Free App-1.0.0.dmg
           RELEASE_NAME: ${{ inputs.release_name }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
+
+          release_assets=(dist/Oracle\ Free\ App-*.dmg)
+          if [ "${#release_assets[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one release asset, found ${#release_assets[@]}."
+            exit 1
+          fi
+          RELEASE_ASSET="${release_assets[0]}"
 
           if [ -z "$RELEASE_TAG" ]; then
             echo "::error::release_tag is required when publish_release is enabled."

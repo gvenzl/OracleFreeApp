@@ -8,9 +8,13 @@ struct BuildScriptPackagingTests {
             encoding: .utf8
         )
 
-        #expect(script.contains("APP_VERSION=\"1.0.0\""))
+        #expect(script.contains("VERSION_FILE=\"$ROOT_DIR/VERSION\""))
+        #expect(script.contains("APP_VERSION=\"$(tr -d '[:space:]' < \"$VERSION_FILE\")\""))
+        #expect(script.range(of: #"APP_VERSION="[0-9]"#, options: .regularExpression) == nil)
         #expect(script.contains("CFBundleShortVersionString"))
         #expect(script.contains("CFBundleVersion"))
+        #expect(script.contains("BUNDLE_ID=\"com.gvenzl.OracleFreeApp\""))
+        #expect(script.contains("CFBundleIdentifier"))
         #expect(script.contains("--package|package"))
         #expect(script.contains("PACKAGE_IMAGE=\"$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION.dmg\""))
         #expect(script.contains("LEGACY_PACKAGE_ARCHIVE=\"$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION-unsigned.zip\""))

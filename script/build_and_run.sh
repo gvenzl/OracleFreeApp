@@ -4,11 +4,16 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="OracleFreeApp"
 APP_DISPLAY_NAME="Oracle Free App"
-APP_VERSION="1.0.0"
-BUNDLE_ID="com.oraclefreeapp.OracleFreeApp"
+BUNDLE_ID="com.gvenzl.OracleFreeApp"
 MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION_FILE="$ROOT_DIR/VERSION"
+APP_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+if [ -z "$APP_VERSION" ]; then
+  echo "VERSION file must contain an application version." >&2
+  exit 2
+fi
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_DISPLAY_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"

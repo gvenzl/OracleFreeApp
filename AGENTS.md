@@ -105,7 +105,7 @@ cd /Users/gvenzl/git/OracleFreeApp
 ./script/build_and_run.sh --package
 ```
 
-`--package` creates a disk image named `dist/Oracle Free App-1.0.0.dmg`.
+`--package` creates a disk image named `dist/Oracle Free App-<version>.dmg`, where `<version>` comes from the repository root `VERSION` file.
 The completed `.app` inside the DMG is ad hoc signed after `Info.plist` and resources are assembled
 so `codesign --verify --deep --strict` passes. It is useful for local bundle validation, but it is
 not Developer ID signed, notarized, or ready for Gatekeeper distribution.
