@@ -32,6 +32,7 @@ playground.xcworkspace
 .build/
 dist/
 .codex/
+.DS_Store
 
 # CocoaPods
 #
