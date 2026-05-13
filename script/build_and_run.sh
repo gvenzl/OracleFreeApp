@@ -85,6 +85,7 @@ package_app() {
   rm -rf "$DMG_STAGING_DIR"
   mkdir -p "$DMG_STAGING_DIR"
   /usr/bin/ditto "$APP_BUNDLE" "$DMG_STAGING_DIR/$APP_DISPLAY_NAME.app"
+  ln -s /Applications "$DMG_STAGING_DIR/Applications"
   /usr/bin/hdiutil create \
     -volname "$APP_DISPLAY_NAME" \
     -srcfolder "$DMG_STAGING_DIR" \

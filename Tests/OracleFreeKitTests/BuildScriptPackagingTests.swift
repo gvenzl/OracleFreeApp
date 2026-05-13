@@ -49,4 +49,22 @@ struct BuildScriptPackagingTests {
         #expect(script.contains("APP_ICON_PNG_SOURCE="))
         #expect(copyCommandIndex < signCommandIndex)
     }
+
+    @Test func buildScriptStagesApplicationsShortcutInDMG() throws {
+        let script = try String(
+            contentsOfFile: "script/build_and_run.sh",
+            encoding: .utf8
+        )
+
+        let appCopyCommand = "/usr/bin/ditto \"$APP_BUNDLE\" \"$DMG_STAGING_DIR/$APP_DISPLAY_NAME.app\""
+        let applicationsShortcutCommand = "ln -s /Applications \"$DMG_STAGING_DIR/Applications\""
+        let createDMGCommand = "/usr/bin/hdiutil create"
+
+        let appCopyIndex = try #require(script.range(of: appCopyCommand)?.lowerBound)
+        let applicationsShortcutIndex = try #require(script.range(of: applicationsShortcutCommand)?.lowerBound)
+        let createDMGIndex = try #require(script.range(of: createDMGCommand)?.lowerBound)
+
+        #expect(appCopyIndex < applicationsShortcutIndex)
+        #expect(applicationsShortcutIndex < createDMGIndex)
+    }
 }
