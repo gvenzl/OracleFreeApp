@@ -24,6 +24,8 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/OracleFreeKit/Resources/OracleFreeAppIcon.icns"
 APP_ICON_PNG_SOURCE="$ROOT_DIR/Sources/OracleFreeKit/Resources/OracleFreeAppIcon.png"
 DMG_STAGING_DIR="$DIST_DIR/dmg-root"
+DMG_SETTINGS_FILE="$ROOT_DIR/script/dmg_settings.py"
+DMG_BACKGROUND_IMAGE="$DIST_DIR/dmg-background.png"
 PACKAGE_IMAGE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION.dmg"
 LEGACY_PACKAGE_ARCHIVE="$DIST_DIR/$APP_DISPLAY_NAME-$APP_VERSION-unsigned.zip"
 
@@ -81,17 +83,23 @@ open_app() {
 
 package_app() {
   rm -f "$PACKAGE_IMAGE"
+  rm -f "$DMG_BACKGROUND_IMAGE"
   rm -f "$LEGACY_PACKAGE_ARCHIVE"
   rm -rf "$DMG_STAGING_DIR"
   mkdir -p "$DMG_STAGING_DIR"
   /usr/bin/ditto "$APP_BUNDLE" "$DMG_STAGING_DIR/$APP_DISPLAY_NAME.app"
-  ln -s /Applications "$DMG_STAGING_DIR/Applications"
-  /usr/bin/hdiutil create \
-    -volname "$APP_DISPLAY_NAME" \
-    -srcfolder "$DMG_STAGING_DIR" \
-    -ov \
-    -format UDZO \
+  /usr/bin/swift "$ROOT_DIR/script/generate_dmg_background.swift" "$DMG_BACKGROUND_IMAGE"
+  if ! python3 -c "import dmgbuild" >/dev/null 2>&1; then
+    echo "dmgbuild is required to package the application. Install it with: python3 -m pip install dmgbuild" >&2
+    exit 2
+  fi
+  python3 -m dmgbuild \
+    -s "$DMG_SETTINGS_FILE" \
+    -D "app=$DMG_STAGING_DIR/$APP_DISPLAY_NAME.app" \
+    -D "background=$DMG_BACKGROUND_IMAGE" \
+    "$APP_DISPLAY_NAME" \
     "$PACKAGE_IMAGE"
+  rm -f "$DMG_BACKGROUND_IMAGE"
   rm -rf "$DMG_STAGING_DIR"
   echo "$PACKAGE_IMAGE"
 }

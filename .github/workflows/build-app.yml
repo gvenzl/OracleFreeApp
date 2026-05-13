@@ -40,6 +40,9 @@ jobs:
       - name: Show Swift version
         run: swift --version
 
+      - name: Install DMG packaging tool
+        run: python3 -m pip install --user dmgbuild
+
       - name: Build app archive
         run: ./script/build_and_run.sh --package
 
