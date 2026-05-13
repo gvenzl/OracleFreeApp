@@ -41,7 +41,12 @@ jobs:
         run: swift --version
 
       - name: Install DMG packaging tool
-        run: python3 -m pip install --user dmgbuild
+        run: |
+          python3 -m venv .venv-dmgbuild
+          . .venv-dmgbuild/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install dmgbuild
+          echo "$PWD/.venv-dmgbuild/bin" >> "$GITHUB_PATH"
 
       - name: Build app archive
         run: ./script/build_and_run.sh --package

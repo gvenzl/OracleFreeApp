@@ -23,9 +23,14 @@ struct GitHubActionsWorkflowTests {
             encoding: .utf8
         )
 
-        let installIndex = try #require(workflow.range(of: "python3 -m pip install --user dmgbuild")?.lowerBound)
+        let venvIndex = try #require(workflow.range(of: "python3 -m venv .venv-dmgbuild")?.lowerBound)
+        let pathIndex = try #require(workflow.range(of: "echo \"$PWD/.venv-dmgbuild/bin\" >> \"$GITHUB_PATH\"")?.lowerBound)
+        let installIndex = try #require(workflow.range(of: "python -m pip install dmgbuild")?.lowerBound)
         let packageIndex = try #require(workflow.range(of: "./script/build_and_run.sh --package")?.lowerBound)
 
+        #expect(workflow.range(of: "pip install --user") == nil)
+        #expect(venvIndex < installIndex)
+        #expect(pathIndex < packageIndex)
         #expect(installIndex < packageIndex)
     }
 }
